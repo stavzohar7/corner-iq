@@ -1,0 +1,66 @@
+name: עדכון יומי + פרסום האתר
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 08:00/09:00 שעון ישראל — ההרצה הראשית
+    - cron: '30 11 * * *'  # עדכון יחסים בצהריים (רק אם TWICE_DAILY=true)
+  workflow_dispatch:       # הרצה ידנית מלשונית Actions
+  push:
+    branches: [main]
+    paths-ignore: ['data/**']
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.event_name != 'push' && (github.event.schedule != '30 11 * * *' || vars.TWICE_DAILY == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: ניתוח היום
+        run: node scripts/update.mjs
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          MAX_CALLS: ${{ vars.MAX_CALLS || '95' }}
+          RATE_PER_MIN: ${{ vars.RATE_PER_MIN || '10' }}
+      - name: שמירת הנתונים
+        run: |
+          git config user.name "corner-iq-bot"
+          git config user.email "corner-iq-bot@users.noreply.github.com"
+          git add -f data
+          git diff --cached --quiet || git commit -m "עדכון נתונים $(date -u +%F)"
+          git push
+
+  deploy:
+    needs: update
+    if: always() && (needs.update.result == 'success' || needs.update.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: הכנת קבצי האתר
+        run: |
+          mkdir -p _site
+          cp -r index.html assets _site/
+          mkdir -p _site/data
+          cp -r data/days data/latest.json _site/data/ 2>/dev/null || true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

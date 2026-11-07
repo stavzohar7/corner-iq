@@ -1,0 +1,149 @@
+:root {
+  color-scheme: dark;
+  --bg: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #232321;
+  --line: #34332f;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --home: #3987e5;   /* קבוצה ביתית */
+  --away: #d95926;   /* קבוצה אורחת */
+  --accent: #3987e5;
+  --good: #1f9d55;
+  --warn: #c98500;
+  --bad: #d64545;
+  --radius: 12px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text-primary);
+  font-family: "Segoe UI", "Rubik", "Assistant", Arial, sans-serif; font-size: 15px; line-height: 1.5;
+}
+.muted { color: var(--text-muted); font-size: 13px; }
+button, select, input { font: inherit; color: inherit; }
+
+.top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); background: var(--surface-1); position: sticky; top: 0; z-index: 5; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo { font-size: 32px; }
+h1 { margin: 0; font-size: 22px; }
+.sub { margin: 0; color: var(--text-secondary); font-size: 13px; }
+.daybox { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+select { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+
+.banner { margin: 12px 20px 0; padding: 10px 14px; border-radius: var(--radius); background: #3a2a07; border: 1px solid var(--warn); }
+.banner.info { background: var(--surface-2); border-color: var(--line); color: var(--text-secondary); }
+
+.tabs { display: flex; gap: 4px; padding: 12px 20px 0; overflow-x: auto; }
+.tab { background: none; border: none; padding: 10px 14px; border-bottom: 3px solid transparent; cursor: pointer; color: var(--text-secondary); white-space: nowrap; }
+.tab.active { color: var(--text-primary); border-color: var(--accent); font-weight: 600; }
+
+.filters { padding: 12px 20px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
+.chip.on { background: #17355c; border-color: var(--accent); }
+.chip .n { color: var(--text-muted); margin-inline-start: 4px; }
+.frow { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+.range { display: flex; align-items: center; gap: 8px; }
+.range input { width: 160px; accent-color: var(--accent); }
+.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.check input { accent-color: var(--accent); }
+
+main { padding: 16px 20px 40px; max-width: 1200px; margin: 0 auto; }
+.view h2 { font-size: 18px; margin: 8px 0 12px; }
+.empty { padding: 40px; text-align: center; color: var(--text-muted); background: var(--surface-1); border-radius: var(--radius); }
+
+/* ---- כרטיסי בחירות ---- */
+.picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.pick { background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: grid; gap: 8px; cursor: pointer; transition: border-color .15s; }
+.pick:hover { border-color: var(--accent); }
+.pick .row { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+.pick .market { font-weight: 700; font-size: 16px; }
+.pick .match { color: var(--text-secondary); font-size: 13px; }
+.pick .reason { font-size: 13px; color: var(--text-secondary); }
+.score { min-width: 54px; height: 54px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 20px; line-height: 1; color: #fff; flex: none; }
+.score small { font-size: 11px; font-weight: 600; opacity: .85; display: block; }
+.score.s-hi { background: var(--good); }
+.score.s-mid { background: var(--warn); }
+.score.s-lo { background: var(--bad); }
+.score.sm { min-width: 36px; height: 30px; font-size: 14px; border-radius: 8px; }
+.oddsTag { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font-weight: 700; white-space: nowrap; }
+.oddsTag.none { font-weight: 400; color: var(--text-muted); font-size: 12px; }
+.res { font-size: 12px; font-weight: 700; border-radius: 6px; padding: 1px 8px; }
+.res.win, .res.halfwin { background: #123d25; color: #7ee2a8; }
+.res.lose, .res.halflose { background: #4a1717; color: #ff9b9b; }
+.res.push { background: var(--surface-2); color: var(--text-secondary); }
+
+/* פסי הסתברות */
+.pbar { display: grid; gap: 3px; font-size: 12px; color: var(--text-secondary); }
+.pbar .lane { display: grid; grid-template-columns: 74px 1fr 40px; align-items: center; gap: 6px; }
+.pbar .track { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.pbar .fill { height: 100%; border-radius: 4px; background: var(--accent); }
+.pbar .fill.mkt { background: #8f8e86; }
+
+/* ---- רשימת משחקים ---- */
+.lgGroup { margin-bottom: 22px; }
+.lgGroup h3 { font-size: 15px; color: var(--text-secondary); margin: 0 0 8px; }
+.game { display: grid; grid-template-columns: 56px 1fr auto auto; align-items: center; gap: 12px; padding: 10px 14px; background: var(--surface-1); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 6px; cursor: pointer; }
+.game:hover { border-color: var(--accent); }
+.game .time { color: var(--text-muted); font-size: 13px; }
+.game .teams { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.game .exp { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+.tlogo { width: 22px; height: 22px; border-radius: 50%; object-fit: contain; background: var(--surface-2); display: inline-grid; place-items: center; font-size: 10px; font-weight: 700; flex: none; }
+
+/* ---- חלון משחק ---- */
+dialog { width: min(980px, 96vw); max-height: 92vh; padding: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-1); color: var(--text-primary); }
+dialog::backdrop { background: rgba(0,0,0,.65); }
+.dlgHead { position: sticky; top: 0; background: var(--surface-1); padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 10px; z-index: 2; }
+.dlgHead h2 { margin: 0; font-size: 19px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.close { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; cursor: pointer; }
+.dlgBody { padding: 16px 20px 24px; display: grid; gap: 18px; }
+.card { background: var(--surface-2); border-radius: var(--radius); padding: 14px; }
+.card h4 { margin: 0 0 10px; font-size: 14px; color: var(--text-secondary); font-weight: 600; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } .game { grid-template-columns: 44px 1fr; } .game .exp, .game .best { grid-column: 2; } }
+
+.expBig { display: flex; justify-content: space-around; align-items: center; text-align: center; gap: 10px; }
+.expBig .num { font-size: 34px; font-weight: 800; line-height: 1.1; }
+.expBig .lbl { font-size: 13px; color: var(--text-secondary); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-inline-end: 6px; }
+.dot.h { background: var(--home); } .dot.a { background: var(--away); }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+th { color: var(--text-muted); font-weight: 600; }
+td.num, th.num { text-align: center; font-variant-numeric: tabular-nums; }
+tr.isPick td { background: rgba(57,135,229,.08); }
+.pos { color: #7ee2a8; } .neg { color: #ff9b9b; }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--surface-1); border: 1px solid var(--line); }
+.tag.up::before { content: "▲ "; color: #7ee2a8; }
+.tag.down::before { content: "▼ "; color: #ff9b9b; }
+.tag.info::before { content: "● "; color: var(--text-muted); }
+
+.notes { margin: 0; padding-inline-start: 18px; display: grid; gap: 4px; color: var(--text-secondary); }
+
+/* היסטוגרמת סה"כ קרנות */
+.hist { display: flex; align-items: flex-end; gap: 2px; height: 140px; padding-top: 6px; border-bottom: 1px solid var(--line); direction: ltr; }
+.hist .b { flex: 1; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 1px; position: relative; }
+.hist .b.exp { background: #6da7ec; }
+.hist .b:hover { background: #86b6ef; }
+.histAx { display: flex; gap: 2px; direction: ltr; font-size: 11px; color: var(--text-muted); }
+.histAx span { flex: 1; text-align: center; }
+
+/* מעקב */
+.trackBars { display: grid; gap: 6px; }
+.tb { display: grid; grid-template-columns: 50px 1fr 150px; gap: 10px; align-items: center; font-size: 13px; }
+.tb .track { height: 16px; background: var(--surface-2); border-radius: 4px; overflow: hidden; position: relative; }
+.tb .fill { height: 100%; border-radius: 4px; background: var(--accent); }
+.tb .half { position: absolute; top: 0; bottom: 0; right: 50%; border-right: 1px dashed var(--text-muted); }
+
+.about { max-width: 820px; display: grid; gap: 14px; }
+.about .card p, .about .card li { color: var(--text-secondary); }
+.scale { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; direction: ltr; }
+.scale div { text-align: center; padding: 6px 0; border-radius: 6px; font-weight: 700; color: #fff; }
+
+.tip { position: fixed; pointer-events: none; background: #000; color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 12px; z-index: 50; border: 1px solid var(--line); }
+.foot { padding: 20px; border-top: 1px solid var(--line); color: var(--text-secondary); font-size: 13px; text-align: center; }
+.foot p { margin: 4px 0; }
