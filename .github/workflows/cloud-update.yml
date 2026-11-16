@@ -74,7 +74,7 @@ jobs:
       - name: הכנת קבצי האתר
         run: |
           mkdir -p _site
-          cp -r index.html assets _site/
+          cp -r index.html manifest.webmanifest assets _site/
           mkdir -p _site/data
           cp -r data/days data/bball data/latest.json data/stats.json data/slips.json data/teams.json data/lessons.json _site/data/
       - uses: actions/upload-pages-artifact@v3

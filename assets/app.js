@@ -91,7 +91,7 @@ async function loadDay(date) {
 function goTab(t) { state.tab = t; if (location.hash) location.hash = ''; else route(); }
 function showView(name, tab) {
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== 'view-' + name);
-  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', name !== 'match' && b.dataset.tab === (tab || name)));
+  document.querySelectorAll('.tab').forEach(b => { const on = name !== 'match' && b.dataset.tab === (tab || name); b.classList.toggle('active', on); if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
 }
 const subNav = (items, cur, attr) => '<div class="chips subnav">' + items.map(([k, l]) => '<button class="chip' + (cur === k ? ' on' : '') + '" data-' + attr + '="' + k + '">' + l + '</button>').join('') + '</div>';
 const lnav = cur => subNav([['teams', '🧠 קבוצות'], ['tables', '📋 טבלאות']], cur, 'lsub');
@@ -272,11 +272,21 @@ document.addEventListener('click', e => {
   const t = b.dataset.t;
   if (navigator.share) navigator.share({ text: t }).catch(() => {}); else window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
 });
+const slipKey = (d, S) => 'ciq-pl-' + d.date + '|' + S.legs.map(l => l.id + ':' + (l.kind || l.key || l.label)).join(',');
+const getPlay = k => { try { return JSON.parse(store.get(k) || 'null'); } catch (e) { return null; } };
+document.addEventListener('change', e => {
+  const c = e.target.closest && e.target.closest('[data-sk]'); if (!c || !(e.target.matches('.playChk, .playStake'))) return;
+  const k = c.dataset.sk, chk = c.querySelector('.playChk'), st = c.querySelector('.playStake');
+  if (e.target === chk && chk.checked && !(parseFloat(st.value) > 0)) st.value = store.get('ciq-lastStake') || '100';
+  if (chk.checked) { const s = parseFloat(st.value) || 0; store.set('ciq-lastStake', String(s)); store.set(k, JSON.stringify({ s })); } else store.set(k, 'null');
+  c.classList.toggle('played', chk.checked);
+});
 function slipCardHtml(d, S, title, sub, cls) {
   const prob = S.legs.reduce((a, l) => a * (l.p > 0 ? l.p : 0.6), 1), once = Math.max(2, Math.round(1 / prob)), whys = S.legs.filter(l => l.why), bestLeg = S.legs.some(l => l.p > 0) ? S.legs.reduce((a, l) => (l.p || 0) > (a.p || 0) ? l : a, S.legs[0]) : null;
-  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + '"><h3>' + title + ' <span class="muted">' + sub + '</span></h3>' + S.legs.map((l, i) => slipLegHtml(d, l, i + 1, bestLeg === l)).join('') +
+  const sk = slipKey(d, S), pl = getPlay(sk);
+  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + (pl ? ' played' : '') + '" data-sk="' + esc(sk) + '"><h3>' + title + ' <span class="muted">' + sub + '</span></h3>' + S.legs.map((l, i) => slipLegHtml(d, l, i + 1, bestLeg === l)).join('') +
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
-    '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="siteTotal"></div><p class="muted slipFoot">100 ₪ משלמים ' + Math.round(100 * S.total) + ' ₪ · נתפס בערך פעם ב-' + once + ' טפסים' + (S.res === 'win' ? ' · <b class="pos">נתפס ✅</b>' : S.res === 'lose' ? ' · <b class="neg">נפל ❌</b>' : '') + '</p></div>';
+    '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div><p class="muted slipFoot">100 ₪ משלמים ' + Math.round(100 * S.total) + ' ₪ · נתפס בערך פעם ב-' + once + ' טפסים' + (S.res === 'win' ? ' · <b class="pos">נתפס ✅</b>' : S.res === 'lose' ? ' · <b class="neg">נפל ❌</b>' : '') + '</p></div>';
 }
 function slipsHtml(s, sp) {
   if (!s || !s.k) return '';
@@ -344,6 +354,11 @@ async function fillSlipHist() {
   const box = $('#slipHist'); if (!box) return;
   const days = (await loadSlips()).days.filter(d => d.k); if (!days.length) return;
   const rows = [];
+  const mine = [];
+  for (const d of days) { const all = []; for (const [lv, nm] of SLIP_LV) for (const [sp, spn] of SLIP_SP) { const X = slipAt(d, lv, sp); if (X.legs.length) all.push([nm.replace('הטופס ', '') + ' · ' + spn, X]); } for (const w of d.k.win || []) if (w.legs.length) all.push(['שעות · ' + w.label, w]); for (const w of d.k.lg || []) if (w.legs.length) all.push(['קבוע · ' + w.label, w]);
+    for (const [nm, X] of all) { const p = getPlay(slipKey(d, X)); if (p && p.s > 0) mine.push({ d, nm, X, s: p.s, profit: X.res === 'win' ? p.s * (X.total - 1) : X.res === 'lose' ? -p.s : 0 }); } }
+  const myHtml = '<div class="card"><h4>💼 מה ששיחקתי בפועל</h4>' + (mine.length ? (() => { const done = mine.filter(m => m.X.res), prof = done.reduce((a, m) => a + m.profit, 0), inv = mine.reduce((a, m) => a + m.s, 0);
+    return '<p class="sub2">רק טפסים שסימנת "שיחקתי", עם הסכום שהימרת. הסימון נשמר רק בטלפון / במחשב הזה.</p><div class="kpis"><div class="kpi"><b class="' + moneyCls(prof) + '">' + fmtMoney(prof) + '</b><span>רווח / הפסד (על מה שנגמר)</span></div><div class="kpi"><b>' + Math.round(inv) + ' ₪</b><span>סך מה שהימרת</span></div><div class="kpi"><b>' + done.filter(m => m.X.res === 'win').length + ' מתוך ' + done.length + '</b><span>טפסים שנתפסו</span></div><div class="kpi"><b>' + (mine.length - done.length) + '</b><span>ממתינים ⏳</span></div></div><div class="tblWrap"><table><thead><tr><th>יום</th><th>טופס</th><th class="num">סכום</th><th class="num">מצב</th><th class="num">רווח</th></tr></thead><tbody>' + mine.map(m => '<tr><td>' + fmtShort(m.d.date) + '</td><td>' + m.nm + '</td><td class="num">' + Math.round(m.s) + ' ₪</td><td class="num">' + (m.X.res === 'win' ? '✅' : m.X.res === 'lose' ? '❌' : '⏳') + '</td><td class="num"><b class="' + moneyCls(m.profit) + '">' + (m.X.res ? fmtMoney(m.profit) : '—') + '</b></td></tr>').join('') + '</tbody></table></div>'; })() : '<p class="muted" style="margin:0">עוד לא סימנת שום טופס. בלשונית "היום", מתחת לכל טופס, סמן "שיחקתי את הטופס הזה" והזן סכום, וכאן יופיע המאזן האמיתי שלך.</p>') + '</div>';
   for (const d of days) { for (const [lv, name] of SLIP_LV) for (const [sp, spName] of SLIP_SP) { const X = slipAt(d, lv, sp); if (X.legs.length) rows.push({ d, lv, sp, name: name.replace('הטופס ', '') + ' · ' + spName, S: X }); } for (const w of (d.k.win || [])) if (w.legs.length) rows.push({ d, lv: 'win', sp: 'f', name: 'שעות · ⚽ ' + w.label, S: w }); for (const w of (d.k.lg || [])) if (w.legs.length) rows.push({ d, lv: 'lg', sp: 'f', name: 'קבוע · ⚽ ' + w.label, S: w }); }
   if (!rows.length) return;
   const agg = list => { const done = list.filter(r => r.S.res), w = done.filter(r => r.S.res === 'win').length, l = done.length - w; return { n: list.length, done: done.length, w, l, pend: list.length - done.length, money: done.reduce((s, r) => s + slipMoney(r.S), 0) }; };
@@ -357,7 +372,7 @@ async function fillSlipHist() {
   const dayList = [...new Set(rows.map(r => r.d.date))].sort().reverse();
   html += '<div class="tblWrap" style="margin-top:10px"><table>' + th.replace('<th></th>', '<th>לפי יום</th>') + '<tbody>' + dayList.map(dt => tr(fmtDay(dt), agg(rows.filter(r => r.d.date === dt)))).join('') + '</tbody></table></div></div>';
   html += '<div class="card"><h4>📋 כל הטפסים בפירוט</h4><div class="tblWrap"><table><thead><tr><th>יום</th><th>טופס</th><th>ההימורים</th><th class="num">יחס כולל</th><th class="num">מצב</th><th class="num">מאזן</th></tr></thead><tbody>' + rows.map(({ d, name, S }) => '<tr><td>' + fmtShort(d.date) + '</td><td>' + name + '</td><td>' + S.legs.map(l => (l.res === 'win' ? '✅ ' : l.res === 'lose' ? '❌ ' : l.res === 'push' ? '↩ ' : '') + esc(l.label) + (l.act ? ' <span class="muted">(' + esc(l.act) + ')</span>' : '')).join('<br>') + '</td><td class="num">' + S.total.toFixed(2) + '</td><td class="num">' + (S.res ? '<span class="res ' + S.res + '">' + (S.res === 'win' ? 'נתפס ✅' : 'נפל ❌') + '</span>' : '⏳') + '</td><td class="num"><b class="' + moneyCls(slipMoney(S)) + '">' + (S.res ? fmtMoney(slipMoney(S)) : '—') + '</b></td></tr>').join('') + '</tbody></table></div></div>';
-  box.innerHTML = html;
+  box.innerHTML = myHtml + html;
 }
 function singleRow(f, m, i) {
   return '<div class="srow' + (m.res ? ' fin-' + RES[m.res][1] : '') + '" onclick="openMatch(' + i + ')"><span class="score ' + scoreCls(m.score) + '" title="דירוג ' + m.score + ' מתוך 10">' + m.score + '</span><div class="smain"><div class="plabel">' + mIcon(m) + ' ' + esc(m.label) + '</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div>' + (m.res ? resStrip(f, m) : '') + '</div><div class="sside">' + oddsTag(m) + '</div></div>';
@@ -1040,3 +1055,6 @@ new MutationObserver(() => {
     p.parentNode.insertBefore(d, p); d.appendChild(p);
   });
 }).observe(document.querySelector('main'), { childList: true, subtree: true });
+
+// ---- כפתור חזרה למעלה ----
+{ const tt = document.getElementById('toTop'); if (tt) { tt.onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' }); window.addEventListener('scroll', () => { tt.hidden = window.scrollY < 700; }, { passive: true }); } }
