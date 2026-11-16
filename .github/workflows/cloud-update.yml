@@ -1,0 +1,84 @@
+name: עדכון בענן
+
+# רץ בענן של GitHub כל שעה (בדקה 30), גם כשהמחשב של הבעלים כבוי.
+# אם המחשב עדכן בשעה וחצי האחרונות, הענן מדלג (המחשב קודם, כדי שלא יהיו התנגשויות).
+on:
+  schedule:
+    - cron: '30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: cloud-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      skip: ${{ steps.chk.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: האם המחשב עדכן לאחרונה?
+        id: chk
+        run: |
+          author=$(git log -1 --format=%an)
+          age=$(( $(date +%s) - $(git log -1 --format=%ct) ))
+          if [ "$author" != "corner-iq-bot" ] && [ "$age" -lt 5400 ] && [ "${{ github.event_name }}" = "schedule" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "המחשב עדכן לפני $age שניות, מדלג"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.skip != 'true'
+        with:
+          node-version: 22
+      - name: שחזור מטמון הנתונים
+        if: steps.chk.outputs.skip != 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/cache
+            data/knowledge
+            data/expert
+            data/news
+            data/names-he.json
+            data/model.json
+          key: ciq-cache-${{ github.run_id }}
+          restore-keys: ciq-cache-
+      - name: עדכון, בדיקת תוצאות, ניתוח היום ומחר, ודחיפה
+        if: steps.chk.outputs.skip != 'true'
+        run: |
+          git config user.name "corner-iq-bot"
+          git config user.email "corner-iq-bot@users.noreply.github.com"
+          node scripts/auto.mjs
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          MAX_CALLS: ${{ vars.MAX_CALLS || '90' }}
+          RATE_PER_MIN: ${{ vars.RATE_PER_MIN || '10' }}
+
+  deploy:
+    needs: update
+    if: needs.update.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: הכנת קבצי האתר
+        run: |
+          mkdir -p _site
+          cp -r index.html assets _site/
+          mkdir -p _site/data
+          cp -r data/days data/bball data/latest.json data/stats.json data/slips.json data/teams.json _site/data/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

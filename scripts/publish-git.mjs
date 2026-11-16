@@ -10,6 +10,8 @@ git('add', '-f', '--', 'data/days', 'data/bball', 'data/latest.json', 'data/stat
 if (git('diff', '--cached', '--quiet').status === 0) { console.log('אין שינויים לפרסום'); process.exit(0); }
 const c = git('commit', '-m', 'עדכון אוטומטי ' + new Date().toISOString().slice(0, 16));
 if (c.status !== 0) { console.error(c.stderr); process.exit(1); }
+// אם הענן דחף בינתיים: ממזגים, ובהתנגשות בקבצי נתונים הגרסה המקומית מנצחת (הנתונים נבנים מחדש בכל שעה)
+git('pull', '--no-rebase', '--autostash', '-X', 'ours', '--no-edit', 'origin', 'main');
 const p = git('push', 'origin', 'HEAD:main');
 if (p.status !== 0) { console.error(p.stderr); process.exit(1); }
 console.log('נדחף ל-GitHub');
