@@ -409,6 +409,18 @@ function marketsTable(f) {
     ms.map(({ m, i }) => { const h = m.hist || {}; return '<tr class="' + (f.picks.includes(i) ? 'isPick' : '') + '"><td>' + (f.picks.includes(i) ? '⭐ ' : '') + mIcon(m) + ' ' + esc(m.label) + '</td><td class="num">' + oddsTag(m) + '</td><td class="num">' + heat(h.hv) + '</td><td class="num">' + heat(h.av) + '</td><td class="num"><span class="score ' + scoreCls(m.score) + '">' + m.score + '</span></td><td class="num">' + (m.res ? resChip(m) + actSmall(m) : '<span class="muted">—</span>') + '</td>' +
       '<td class="num"><div class="myOdds inline" data-fid="' + esc(f.id) + '" data-mi="' + i + '"><input type="number" step="0.01" min="1.01" inputmode="decimal" placeholder="יחס"><span class="myRes"></span></div></td></tr>'; }).join('') + '</tbody></table></div>';
 }
+function stakesCard(f) {
+  const c = f.ctx; if (!c) return '';
+  const rows = [];
+  for (const [side, T] of [['h', f.home], ['a', f.away]]) {
+    const s = c.stakes && c.stakes[side], r = c.rest && c.rest[side];
+    if (!s && !r) continue;
+    rows.push('<li><b>' + bd(T.name) + ':</b> ' + (s ? esc(s.text) + ' <span class="muted">(' + s.pts + ' נקודות אחרי ' + s.played + ' משחקים)</span>' : '') + (r ? (s ? ' · ' : '') + (r.days <= 3 ? '⚠️ ' : '') + r.days + ' ימי מנוחה' + (r.last14 >= 3 ? ', ' + r.last14 + ' משחקים ב-14 ימים' : '') : '') + '</li>');
+  }
+  if (!rows.length) return '';
+  const tn = c.tension === 'high' ? 'שתי הקבוצות עם הרבה על הכף: משחק רציני משני הצדדים.' : c.tension === 'low' ? 'לשתי הקבוצות אין הרבה על הכף: סיכוי לרוטציה ולמשחק פחות לוחץ.' : '';
+  return '<div class="card"><h4>🎯 מה על הכף ואיך הן מגיעות</h4><ul class="notes">' + rows.join('') + '</ul>' + (tn ? '<p class="muted" style="margin:6px 0 0">' + tn + '</p>' : '') + '</div>';
+}
 function renderMatch(i) {
   const f = state.day.fixtures[i], lg = leagueOf(f.lg), ch = f.character || {};
   let html = '<div class="mbar"><button class="btn" onclick="goTab(state.tab)">← חזרה</button><span class="muted">' + esc(lg.he) + (heRound(f.round) ? ' · ' + heRound(f.round) : '') + '</span></div>' +
@@ -435,7 +447,7 @@ function renderMatch(i) {
   const exEnd = html.length;
   html += '<div class="card"><h4>⭐ ההמלצות למשחק</h4>' + (picks.length ? '<div class="recs">' + picks.map(m => recRow(m, f)).join('') + '</div>' : '<p class="muted" style="margin:0">אין המלצה חזקה במשחק הזה.</p>') + '</div>';
   html = html.slice(0, exStart) + html.slice(exEnd) + html.slice(exStart, exEnd);   // ההמלצות קודם, ואחריהן הדעה והסיפור
-  html += winnerCard(f) + newsCard(f);
+  html += stakesCard(f) + winnerCard(f) + newsCard(f);
   html += '<div class="card more"><h4>📋 ההימורים החזקים במשחק (ציון 6 ומעלה)</h4><p class="sub2">"בית" ו"חוץ" = בכמה ממשחקי הבית של המארחת ובכמה ממשחקי החוץ של האורחת ההימור עבר. אפשר להקליד יחס מאתר ההימורים ולקבל דירוג מיידי.</p>' + marketsTable(f) + '</div>';
   const scout = f.scout && f.scout.lines && f.scout.lines.length ? '<div class="card scoutCard"><h4>🧭 איך הן משחקות בבית, בחוץ ומול סוג כזה של יריבה</h4><ul class="notes">' + f.scout.lines.map(l => '<li>' + esc(l) + '</li>').join('') + '</ul></div>' : '';
   html += '<details class="more bigMore"><summary><b>עוד נתונים על המשחק</b> (צפי, היסטוריה, בית וחוץ, ראש בראש)</summary>' + scout + expectCard(f) + historyCard(f) + '<div class="grid2">' + relevantTable(f, 'h') + relevantTable(f, 'a') + '</div>' + h2hCard(f) + '</details>';

@@ -18,6 +18,7 @@ import { footAct } from './acttext.mjs';
 import { loadCupRows, tierOf, refreshCups, cupClass, cupMarkets } from './cup-mismatch.mjs';
 import { loadLore, saveLore, syncLore, buildLore, loreBrief, teamStory } from './lore.mjs';
 import { teamKnowledge, learnFromDays, leagueStats, leagueProfile } from './knowledge.mjs';
+import { buildRestIndex, stakesOf, addStakeWarnings } from './stakes.mjs';
 import { compactFixture, buildLeagueModel, analyzeFixture, teamProfile, settle, oneHot, TUNE } from './model.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -233,6 +234,7 @@ async function main() {
   // גביעים: קבוצה מקצועית מול קבוצה קטנה בלי נתונים. מנתחים לפי היסטוריית הגביעים (cup-mismatch.mjs)
   const CUP_LG = [45, 48, 137, 143, 81, 384]; let cupRows = [], cupCls = new Map();
   if (dayFx.some(it => CUP_LG.includes(it.league.id))) { try { await refreshCups(ROOT, log); cupRows = loadCupRows(ROOT); cupCls = await cupClass(ROOT, today); } catch (e) { log('גביע: ' + e.message); } }
+  const restIdx = buildRestIndex([...Object.values(cache.matches), ...histRecords]);
   const fixtures = [];
   for (const it of [...dayFx].sort((x, y) => x.fixture.timestamp - y.fixture.timestamp)) {
     const id = it.fixture.id, lgId = it.league.id;
@@ -269,6 +271,7 @@ async function main() {
     const fx = { id, ts: it.fixture.timestamp, status: it.fixture.status?.short || 'NS', round: it.league.round || '', venue: it.fixture.venue?.name || '', lg: lgId, h: hId, a: aId, ref: it.fixture.referee || null };
     const bets = [...(odds.get(id) || []), ...(realOdds.get(String(id)) || [])]; // יחסי football-data, ואז Bet365 אמיתיים (מחליפים)
     fixtures.push(applyExpert(analyzeFixture(fx, model, info, bets, ctx), expertDoc[String(id)]));
+    try { fixtures[fixtures.length - 1].ctx = stakesOf({ standMap: standings.get(lgId)?.map, restIdx, hId, aId, ts: it.fixture.timestamp }); addStakeWarnings(fixtures[fixtures.length - 1]); } catch (e) { log('מה על הכף נכשל: ' + e.message); }
     if (prev && prev.markets && prev.markets.length && !fixtures[fixtures.length - 1].markets.length) { fixtures[fixtures.length - 1] = prev; log(`נשמר הניתוח הקודם של ${names.h} – ${names.a} (הרצה זו לא הצליחה לבנות שווקים)`); }
     { const f0 = fixtures[fixtures.length - 1], cl = cupCls.get(String(id));
       if (!f0.enough && cl && CUP_LG.includes(lgId)) { const tH = tierOf(cl.hm), tA = tierOf(cl.am);

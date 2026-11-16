@@ -36,6 +36,7 @@ function logLines(T, n = 8) {
   return T.log.slice(0, n).map(e => `  ${fmtDay(e.ts)} ${e.v === 'H' ? 'בית ' : 'חוץ '} מול ${plain(e.opp)}${e.rank ? ` (#${e.rank}${e.tier ? ' ' + e.tier : ''})` : ''}  ${e.g[0]}-${e.g[1]} | קרנות ${num(e.c[0])}-${num(e.c[1])} | בעיטות ${num(e.sh[0])}-${num(e.sh[1])} | למסגרת ${num(e.sot[0])}-${num(e.sot[1])}`).join('\n');
 }
 
+import { stakesLines } from './stakes.mjs';
 export function writeDossier(file, { date, fixtures, leagueName, max = 14 }) {
   const now = Date.now();
   const cand = fixtures.filter(f => f.enough && f.ts * 1000 > now - 5 * 60e3).sort((a, b) => (b.quality || 0) - (a.quality || 0)).slice(0, max).sort((a, b) => a.ts - b.ts);
@@ -50,6 +51,7 @@ export function writeDossier(file, { date, fixtures, leagueName, max = 14 }) {
     out.push(`כושר: ${plain(H.name)} ${H.form || '-'} · ${plain(A.name)} ${A.form || '-'}`);
     out.push(`${plain(H.name)} — 8 אחרונים (חדש לישן):\n${logLines(H)}`);
     out.push(`${plain(A.name)} — 8 אחרונים:\n${logLines(A)}`);
+    { const sl = stakesLines(f.ctx, { h: plain(H.name), a: plain(A.name) }); if (sl.length) out.push('מה על הכף ואיך מגיעות (מחושב אוטומטית):\n' + sl.map(l => '  - ' + l).join('\n')); }
     const sc = f.scout;
     if (sc && sc.data) {
       for (const k of ['h', 'a']) {
