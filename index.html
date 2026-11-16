@@ -2,68 +2,54 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>קורנר IQ — ניתוח קרנות יומי</title>
-<meta name="description" content="ניתוח יומי של קרנות בליגות הגדולות לפי סגנון משחק, בית/חוץ ויחסי Bet365, עם דירוג 1-10.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101112">
+<title>קורנר IQ — ניתוח יומי</title>
+<meta name="description" content="ההמלצות הכי טובות של היום: קרנות, בעיטות, בעיטות למסגרת, שערים ומנצחת, לפי סטטיסטיקה.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚩</text></svg>">
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand">
-    <span class="logo">🚩</span>
-    <div>
-      <h1>קורנר IQ</h1>
-      <p class="sub">ניתוח קרנות יומי · 11 ליגות · יחסי Bet365</p>
+  <div class="topin">
+    <div class="brand">
+      <span class="logo">🚩</span>
+      <div>
+        <h1>קורנר IQ</h1>
+      </div>
+    </div>
+    <div class="daybox">
+      <select id="daySel" aria-label="בחירת יום"></select>
+      <span id="updated" class="muted"></span>
     </div>
   </div>
-  <div class="daybox">
-    <label for="daySel">יום:</label>
-    <select id="daySel"></select>
-    <span id="updated" class="muted"></span>
-  </div>
+  <nav class="tabs" id="tabs" role="tablist">
+    <button class="tab active" data-tab="today"><span class="ti">🏆</span><span class="tl">היום</span></button>
+    <button class="tab" data-tab="games"><span class="ti">⚽</span><span class="tl">משחקים</span></button>
+    <button class="tab" data-tab="bball"><span class="ti">🏀</span><span class="tl">כדורסל</span></button>
+    <button class="tab" data-tab="leagues"><span class="ti">📚</span><span class="tl">ליגות</span></button>
+    <button class="tab" data-tab="track"><span class="ti">📊</span><span class="tl">מעקב</span></button>
+    <button class="tab" data-tab="more"><span class="ti">🎯</span><span class="tl">ניחושים<span class="tlx"> בין חברים</span></span></button>
+  </nav>
 </header>
 
-<div id="demoBanner" class="banner" hidden>⚠️ <b>מצב דמו</b> — הנתונים המוצגים מומצאים לצורך תצוגה בלבד. אחרי חיבור מפתח API יוצגו נתונים אמיתיים.</div>
-<div id="notes" class="banner info" hidden></div>
-
-<nav class="tabs" role="tablist">
-  <button class="tab active" data-tab="picks">⭐ הבחירות החזקות</button>
-  <button class="tab" data-tab="games">⚽ כל המשחקים</button>
-  <button class="tab" data-tab="track">📊 מעקב הצלחה</button>
-  <button class="tab" data-tab="about">ℹ️ איך זה עובד</button>
-</nav>
-
-<section class="filters" id="filters">
-  <div class="chips" id="leagueChips"></div>
-  <div class="frow">
-    <label class="range">דירוג מינימלי: <b id="minScoreVal">6</b>
-      <input type="range" id="minScore" min="1" max="10" value="6">
-    </label>
-    <label class="check"><input type="checkbox" id="oddsOnly"> רק עם יחס Bet365</label>
-    <select id="marketType">
-      <option value="">כל סוגי ההימורים</option>
-      <option value="total">סה״כ קרנות במשחק</option>
-      <option value="team">קרנות לקבוצה</option>
-      <option value="1x2">מי תיקח יותר קרנות / הנדיקאפ</option>
-    </select>
-  </div>
-</section>
+<div id="banners"></div>
 
 <main>
-  <section id="tab-picks" class="view"></section>
-  <section id="tab-games" class="view" hidden></section>
-  <section id="tab-track" class="view" hidden></section>
-  <section id="tab-about" class="view" hidden></section>
+  <section id="view-today" class="view"></section>
+  <section id="view-games" class="view" hidden></section>
+  <section id="view-tables" class="view" hidden></section>
+  <section id="view-teams" class="view" hidden></section>
+  <section id="view-bball" class="view" hidden></section>
+  <section id="view-guess" class="view" hidden></section>
+  <section id="view-track" class="view" hidden></section>
+  <section id="view-about" class="view" hidden></section>
+  <section id="view-match" class="view" hidden></section>
 </main>
 
-<dialog id="matchDlg">
-  <div id="matchBody"></div>
-</dialog>
-
 <footer class="foot">
-  <p>⚠️ הניתוח הוא סטטיסטי בלבד ואינו מבטיח רווח. הימורים כרוכים בסיכון כספי — הימרו באחריות ורק בסכומים שאתם יכולים להרשות לעצמכם להפסיד. 18+.</p>
-  <p class="muted">היחסים נלקחים מ-API-Football ועשויים להשתנות — תמיד לבדוק את היחס העדכני באתר Bet365 לפני הימור.</p>
+  <p>⚠️ ניתוח סטטיסטי בלבד, ואינו מבטיח רווח. הימרו באחריות ורק בסכום שאפשר להפסיד. 18+. יחס שכתוב "Bet365" נמשך מ-Bet365; "משוער" = אין קו כזה אצלה. בדקו תמיד את היחס העדכני.</p>
+  <p class="muted" id="srcLine"></p>
 </footer>
 <div id="tip" class="tip" hidden></div>
 <script src="assets/app.js"></script>

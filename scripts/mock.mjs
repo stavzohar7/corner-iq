@@ -114,6 +114,13 @@ export function createMock(today) {
     bets.push({ id: 55, name: 'Corners 1x2', values: [{ value: 'Home', odd: price(pH) }, { value: 'Draw', odd: price(pD) }, { value: 'Away', odd: price(1 - pH - pD) }] });
     const ah = lh > la ? -1.5 : 1.5, pAh = sim((x, y) => x - y + ah > 0);
     bets.push({ id: 56, name: 'Corners Asian Handicap', values: [{ value: `Home ${ah > 0 ? '+' : ''}${ah}`, odd: price(pAh) }, { value: `Away ${-ah > 0 ? '+' : ''}${-ah}`, odd: price(1 - pAh) }] });
+    // 1X2 ושערים — לפי הפרש האיכות
+    const H = lat[item.teams.home.id], A = lat[item.teams.away.id];
+    const dq = H.q - A.q + 0.3;
+    const ph = 1 / (1 + Math.exp(-1.1 * dq)) * 0.78, pa = (1 - 1 / (1 + Math.exp(-1.1 * dq))) * 0.78, pd = 1 - ph - pa;
+    bets.unshift({ id: 1, name: 'Match Winner', values: [{ value: 'Home', odd: price(ph) }, { value: 'Draw', odd: price(pd) }, { value: 'Away', odd: price(pa) }] });
+    const po = Math.min(0.75, Math.max(0.35, 0.52 + 0.1 * (H.style + A.style + H.conc + A.conc) + 0.05 * gauss(R)));
+    bets.unshift({ id: 5, name: 'Goals Over/Under', values: [{ value: 'Over 2.5', odd: price(po) }, { value: 'Under 2.5', odd: price(1 - po) }] });
     return bets;
   }
 
@@ -135,6 +142,21 @@ export function createMock(today) {
       const res = [...all.values()].filter(it => it.league.id === Number(p.league) && it.fixture.status.short === 'NS')
         .map(it => ({ league: it.league, fixture: { id: it.fixture.id }, bookmakers: [{ id: 8, name: 'Bet365', bets: oddsFor(it) }], _true: 0 }));
       return wrap(res);
+    }
+    if (path === '/standings') {
+      const lg = Number(p.league), tbl = {};
+      for (const it of all.values()) {
+        if (it.league.id !== lg || it.fixture.status.short !== 'FT') continue;
+        const { home, away } = it.teams, g = it.goals;
+        for (const [t, gf, ga] of [[home, g.home, g.away], [away, g.away, g.home]]) {
+          const r = tbl[t.id] ||= { team: { id: t.id, name: t.name }, points: 0, gd: 0, all: { played: 0 }, form: '' };
+          r.all.played++; r.gd += gf - ga;
+          const res = gf > ga ? 'W' : gf === ga ? 'D' : 'L';
+          r.points += res === 'W' ? 3 : res === 'D' ? 1 : 0; r.form += res;
+        }
+      }
+      const rows = Object.values(tbl).sort((x, y) => y.points - x.points || y.gd - x.gd).map((r, i) => ({ ...r, rank: i + 1 }));
+      return wrap([{ league: { id: lg, season, standings: [rows] } }]);
     }
     throw new Error('mock: unsupported ' + path);
   };

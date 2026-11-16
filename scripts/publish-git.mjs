@@ -1,0 +1,15 @@
+// דוחף את האתר והנתונים ל-GitHub (שם workflow מפרסם ב-Pages). רץ בסוף auto.mjs. אם אין remote או אין שינוי, לא עושה כלום.
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const git = (...a) => spawnSync('git', a, { cwd: ROOT, encoding: 'utf8' });
+if (!git('remote', 'get-url', 'origin').stdout.trim()) { console.log('אין remote ל-git, מדלג על הפרסום'); process.exit(0); }
+git('add', '-A', '--', 'index.html', 'assets', 'scripts', '.github', 'README.md', '.gitignore');
+git('add', '-f', '--', 'data/days', 'data/bball', 'data/latest.json', 'data/stats.json', 'data/slips.json', 'data/teams.json');
+if (git('diff', '--cached', '--quiet').status === 0) { console.log('אין שינויים לפרסום'); process.exit(0); }
+const c = git('commit', '-m', 'עדכון אוטומטי ' + new Date().toISOString().slice(0, 16));
+if (c.status !== 0) { console.error(c.stderr); process.exit(1); }
+const p = git('push', 'origin', 'HEAD:main');
+if (p.status !== 0) { console.error(p.stderr); process.exit(1); }
+console.log('נדחף ל-GitHub');
