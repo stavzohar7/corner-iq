@@ -37,6 +37,8 @@ const today = process.env.DATE || fmtIl(new Date());
 const divLeague = id => FD_DIVS[String(id).split(':')[0]] ?? null; // מזהה קבוצה של football-data → ליגה
 const isFdId = id => String(id).includes(':');
 
+// ההמלצה הטובה ביותר של משחק (לפי ציון, ואז יחס אמיתי, ואז ערך): נבחרת לכל משחק, גם אם לא נכנסה לטפסים
+const bestIdx = f => { let bi = -1; (f.markets || []).forEach((m, i) => { if (bi < 0) { bi = i; return; } const b = f.markets[bi]; if (m.score > b.score || (m.score === b.score && ((!!m.odds && !b.odds) || ((!!m.odds === !!b.odds) && (m.ev || 0) > (b.ev || 0))))) bi = i; }); return bi; };
 const LEARNING_LEAGUES = LEAGUES.filter(l => !EURO.includes(l.id));
 
 async function main() {
@@ -267,6 +269,7 @@ async function main() {
     const fx = { id, ts: it.fixture.timestamp, status: it.fixture.status?.short || 'NS', round: it.league.round || '', venue: it.fixture.venue?.name || '', lg: lgId, h: hId, a: aId, ref: it.fixture.referee || null };
     const bets = [...(odds.get(id) || []), ...(realOdds.get(String(id)) || [])]; // יחסי football-data, ואז Bet365 אמיתיים (מחליפים)
     fixtures.push(applyExpert(analyzeFixture(fx, model, info, bets, ctx), expertDoc[String(id)]));
+    if (prev && prev.markets && prev.markets.length && !fixtures[fixtures.length - 1].markets.length) { fixtures[fixtures.length - 1] = prev; log(`נשמר הניתוח הקודם של ${names.h} – ${names.a} (הרצה זו לא הצליחה לבנות שווקים)`); }
     { const f0 = fixtures[fixtures.length - 1], cl = cupCls.get(String(id));
       if (!f0.enough && cl && CUP_LG.includes(lgId)) { const tH = tierOf(cl.hm), tA = tierOf(cl.am);
         if (!!tH !== !!tA) { const side = tH ? 'h' : 'a', res = cupMarkets(f0, tH || tA, side, bets, cupRows, { h: f0.home.name, a: f0.away.name });
@@ -316,7 +319,8 @@ async function main() {
       .sort((a, b) => a.ts - b.ts).map(f => ({ fid: f.id, cLine: (f.probs && f.probs.cLine) || 9.5 }));
   }
 
-  const dayDoc = { date: today, mode: 'live', updated: new Date().toISOString(), leagues: LEAGUES, notes, fixtures, dayPicks, keyMatches, meta };
+  const matchPicks = fixtures.map(f => ({ fid: f.id, mi: bestIdx(f) })).filter(p => p.mi >= 0);   // המלצה אחת לכל משחק, לפי הליגות שנבחרו
+  const dayDoc = { date: today, mode: 'live', updated: new Date().toISOString(), leagues: LEAGUES, notes, fixtures, dayPicks, matchPicks, keyMatches, meta };
   writeJson(path.join(DAYS, `${today}.json`), dayDoc);
   try { const n = writeDossier(path.join(DATA, 'cache', `dossier-${today}.md`), { date: today, fixtures, leagueName: id => (LEAGUES.find(l => l.id === id) || {}).he || String(id) }); log(`תיקי משחק למנתח: ${n}`); } catch (e) { log('תיק משחק נכשל:', e.message); }
 
@@ -324,7 +328,7 @@ async function main() {
   const index = readJson(path.join(DAYS, 'index.json'), { days: [] });
   if (!index.days.find(d => d.date === today)) index.days.push({ date: today });
   index.days.sort((x, y) => y.date.localeCompare(x.date));
-  const picksLog = [], leagueLog = []; let newly = 0;
+  const picksLog = [], leagueLog = [], matchLog = []; let newly = 0;
   const actualText = (fx, m) => {
     const r = fx.result; if (!r) return null; const S = r.stats || {};
     const val = (st, i) => st === 'g' ? r.g[i] : st === 'c' ? (i === 0 ? r.h : r.a) : (S[st] ? S[st][i] : null);
@@ -383,11 +387,12 @@ async function main() {
       if (!m) continue;
       picksLog.push({ d: d.date, id: fx.id, h: fx.home.name, a: fx.away.name, lg: fx.lg, ts: fx.ts, t: tkey(m), label: m.label, score: m.score, price: m.odds || m.estOdds || null, real: !!m.odds, res: m.res || null, act: m.actT || footAct(fx, m) });
     }
+    for (const f of day.fixtures) { const mi = bestIdx(f), m = mi >= 0 && f.markets[mi]; if (!m) continue; matchLog.push({ d: d.date, id: f.id, h: f.home.name, a: f.away.name, lg: f.lg, ts: f.ts, t: tkey(m), label: m.label, score: m.score, price: m.odds || null, res: m.res || null, act: m.actT || footAct(f, m) }); }
     d.games = games; d.picks = picks; d.graded = day.fixtures.filter(x => x.graded).length;
     if (changed && d.date !== today) writeJson(f, day);
   }
   if (dayDoc.fixtures.some(f => f.graded)) writeJson(path.join(DAYS, `${today}.json`), dayDoc);
-  index.track = buckets; index.detail = detail; index.picksLog = picksLog; index.leagueLog = leagueLog; index.mode = 'live'; index.updated = dayDoc.updated;
+  index.track = buckets; index.detail = detail; index.picksLog = picksLog; index.matchLog = matchLog; index.leagueLog = leagueLog; index.mode = 'live'; index.updated = dayDoc.updated;
   writeJson(path.join(DAYS, 'index.json'), index);
   writeJson(path.join(DATA, 'latest.json'), { date: today });
 

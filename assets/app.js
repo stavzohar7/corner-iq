@@ -128,6 +128,15 @@ function dayChips() {
     return '<button class="chip dchip' + (d.date === state.day.date ? ' on' : '') + '" data-day="' + d.date + '"><b>' + dayName(d.date) + '</b><small>' + fmtShort(d.date) + (sub ? '<br>' + sub : '') + '</small></button>';
   }).join('') + '</div><span class="muted dayHint">ימים ישנים יותר: בתפריט שבראש העמוד</span></div>';
 }
+// סיכום של היום שנבחר, על אותו יום בלבד: טפסים והמלצות בודדות
+function daySummary(date) {
+  const st = slipDayStat(date), L = (state.index.matchLog || []).filter(e => e.d === date), done = L.filter(e => e.res), w = done.filter(e => e.res.includes('win')).length, l = done.filter(e => e.res.includes('lose')).length;
+  if (!st && !L.length) return '';
+  const cell = (t, a, b) => '<div class="kpi"><b>' + a + '</b><span>' + t + (b ? '<br><small>' + b + '</small>' : '') + '</span></div>';
+  return '<div class="card daySum"><h4>📌 סיכום ' + dayName(date) + ' <span class="muted">· ' + fmtShort(date) + ', רק משחקים של היום הזה</span></h4><div class="kpis">' +
+    (st ? cell('טפסים', st.w + ' מתוך ' + st.n, st.w + st.l < st.n ? (st.n - st.w - st.l) + ' עוד ממתינים' : 'כולם נגמרו') : '') +
+    (L.length ? cell('המלצות בודדות (משחק אחד = המלצה אחת)', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div></div>';
+}
 // סיכום "מה קרה ביום האחרון שנגמר": כל טופס ואיך הוא יצא
 function recapHtml(date) {
   const S = state.slips; if (!S) return '';
@@ -237,6 +246,14 @@ async function fillToday(date) {
   const sp = state.slipSp, spName = SLIP_SP.find(x => x[0] === sp)[1];
   let html = sports.length > 1 ? '<div class="chips segBar">' + sports.map(([k, l]) => '<button class="chip' + (k === sp ? ' on' : '') + '" data-slipsp="' + k + '">' + l + '</button>').join('') + '</div>' : '';
   html += '<h3 class="secTitle">📋 הטפסים · ' + spName + '</h3>' + (slipsHtml(s, sp) || '<div class="empty">אין היום טופס ' + SP_IN[sp] + '. טופס נבנה רק כשיש 3 הימורים חזקים.</div>');
+  if (sp === 'f') {
+    const MP = (d.matchPicks || []).map(p => { const f = findFx(p.fid); return f && f.markets[p.mi] ? { f, m: f.markets[p.mi], i: idxOf(p.fid) } : null; }).filter(Boolean).sort((a, b) => a.f.ts - b.f.ts);
+    const noMk = d.fixtures.filter(f => !MP.some(x => x.f === f)).sort((a, b) => a.ts - b.ts);
+    if (MP.length || noMk.length) {
+      const gw = MP.filter(x => x.m.res && x.m.res.includes('win')).length, gl = MP.filter(x => x.m.res && x.m.res.includes('lose')).length;
+      html += '<h3 class="secTitle">🗂 כל משחקי היום: ההמלצה הטובה ביותר לכל משחק' + (gw + gl ? ' <span class="muted">· נתפסו ' + gw + ' · נפלו ' + gl + '</span>' : '') + '</h3><p class="srcNote">לכל משחק בליגות שלנו יש כאן המלצה אחת, גם אם היא לא נכנסה לטפסים. ציון 6 ומעלה = המלצה טובה, מתחת ל-6 = חלשה, לעיון בלבד. לחיצה פותחת את המשחק.</p><div class="srows">' + MP.map(x => singleRow(x.f, x.m, x.i)).join('') + noMk.map(f => '<div class="srow" onclick="openMatch(' + idxOf(f.id) + ')"><span class="score s-lo">–</span><div class="smain"><div class="plabel">אין עדיין המלצה</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div><div class="muted">חסרים נתונים או יחסים. מתעדכן אוטומטית כל שעה.</div></div></div>').join('') + '</div>';
+    }
+  }
   const L = singles[sp], LIM = state.allPicks === sp ? 999 : 8, isW = r => r && r.includes('win'), isL = r => r && r.includes('lose');
   const w = L.filter(x => isW(x.m.res)).length, l = L.filter(x => isL(x.m.res)).length;
   html += '<h3 class="secTitle">🎯 המלצות בודדות · ' + spName + (w + l ? ' <span class="muted">· נתפסו ' + w + ' · נפלו ' + l + '</span>' : '') + '</h3><p class="srcNote">כל המלצה כאן עומדת לבד ואינה חלק מטופס. היחסים כאן של Bet365, לעיון.</p>';
@@ -275,7 +292,7 @@ function singleRow(f, m, i) {
 function renderToday() {
   const el = $('#view-today'), d = state.day;
   const isLatest = state.day.date === state.index.days[0].date, sunday = isLatest && new Date(ilToday() + 'T00:00:00Z').getUTCDay() === 0;
-  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + dayChips() + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + '<div id="todayBody"><div class="empty">טוען...</div></div>';
+  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + dayChips() + daySummary(state.day.date) + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + '<div id="todayBody"><div class="empty">טוען...</div></div>';
   bindDayChips(); fillToday(d.date);
 }
 function keyMatchesHtml(d) {
@@ -775,16 +792,31 @@ function weekHtml(ws, compact) {
   return html + '</div>';
 }
 const trTab = () => state.trSub || 'slips', hid = k => trTab() === k ? '' : ' hidden';
-const trNav = () => subNav([['week', '📅 סיכום שבועי'], ['slips', '💰 הטפסים שלי'], ['recs', '⚽ המלצות לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
+const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['week', '📅 סיכום שבועי'], ['recs', '⚽ המלצות לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
 function weekPanel() {
   const wl = weekList(); if (!wl.length) return '<div class="empty">עוד אין נתונים לסיכום.</div>';
   const cur = state.wk && wl.includes(state.wk) ? state.wk : wl[0];
   return '<div class="chips" style="margin-bottom:10px">' + wl.map(w => '<button class="chip' + (w === cur ? ' on' : '') + '" data-wk="' + w + '">' + wkLabel(w) + '</button>').join('') + '</div>' + weekHtml(cur, false);
 }
+function singlesPanel() {
+  const log = (state.index.matchLog || []).slice().sort((a, b) => b.ts - a.ts), done = log.filter(e => e.res), isW = r => r.includes('win'), isL = r => r.includes('lose');
+  if (!done.length) return '<div class="empty">עדיין אין המלצות בודדות שנגמרו.</div>';
+  const W = done.filter(e => isW(e.res)).length, Lo = done.filter(e => isL(e.res)).length, P = done.length - W - Lo, pend = log.length - done.length;
+  const agg = keyFn => { const o = {}; done.forEach(e => { const k = keyFn(e), b = o[k] ||= { n: 0, w: 0, l: 0 }; b.n++; if (isW(e.res)) b.w++; else if (isL(e.res)) b.l++; }); return o; };
+  const rate = b => b.w + b.l ? b.w + ' מתוך ' + (b.w + b.l) : '—';
+  const tbl = (title, obj, nameFn, order) => '<div class="card"><h4>' + title + '</h4><div class="tblWrap"><table><thead><tr><th></th><th class="num">נגמרו</th><th class="num">נתפסו</th><th class="num">נפלו</th><th class="num">נתפסו מתוך שנגמרו</th></tr></thead><tbody>' + (order || Object.keys(obj)).filter(k => obj[k]).map(k => '<tr><td>' + nameFn(k) + '</td><td class="num">' + obj[k].n + '</td><td class="num">' + obj[k].w + '</td><td class="num">' + obj[k].l + '</td><td class="num"><b>' + rate(obj[k]) + '</b></td></tr>').join('') + '</tbody></table></div></div>';
+  const days = [...new Set(done.map(e => e.d))].sort().reverse(), byLg = agg(e => e.lg);
+  return '<div class="card"><h4>🎯 המלצות בודדות: ההמלצה הטובה ביותר בכל משחק</h4><p class="sub2">לכל משחק נבחרת המלצה אחת (הציון הגבוה ביותר), בין אם היא נכנסה לטפסים ובין אם לא. כל המשחקים נספרים, ולא רק ההמלצות החזקות. ימים קודמים מחושבים לפי אותו כלל אחרי המשחק, לפי הציון בלבד.</p>' +
+    '<div class="kpis"><div class="kpi"><b>' + log.length + '</b><span>המלצות</span></div><div class="kpi"><b class="pos">' + W + '</b><span>נתפסו ✅</span></div><div class="kpi"><b class="neg">' + Lo + '</b><span>נפלו ❌</span></div><div class="kpi"><b>' + (W + Lo ? W + ' מתוך ' + (W + Lo) : '—') + '</b><span>נתפסו מתוך שנגמרו</span></div><div class="kpi"><b>' + (pend + P) + '</b><span>ממתינות או החזר</span></div></div></div>' +
+    '<div class="grid2">' + tbl('לפי סוג הימור', agg(e => e.t), k => TYPE_NAME[k] || k, ['res', 'g', 'c', 'c1', 'sh', 'sot']) + tbl('לפי ציון', agg(e => e.score >= 7 ? '7+' : e.score >= 6 ? '6' : '5 ומטה'), k => 'ציון ' + k, ['7+', '6', '5 ומטה']) + '</div>' +
+    tbl('לפי ליגה', byLg, k => esc(leagueOf(Number(k)).he), Object.keys(byLg).sort((a, b) => byLg[b].n - byLg[a].n)) +
+    tbl('לפי יום', agg(e => e.d), k => fmtDay(k), days) +
+    '<div class="card"><h4>כל ההמלצות שנגמרו</h4><div class="tblWrap"><table><thead><tr><th>יום</th><th>משחק</th><th>המלצה</th><th class="num">ציון</th><th class="num">מצב</th><th>מה קרה</th></tr></thead><tbody>' + done.slice(0, 120).map(e => '<tr class="clk" onclick="openMatchOf(\'' + e.d + '\',\'' + String(e.id).replace(/'/g, '') + '\')"><td>' + fmtShort(e.d) + '</td><td>' + bd(e.h) + ' – ' + bd(e.a) + '</td><td>' + esc(e.label) + '</td><td class="num"><span class="score ' + scoreCls(e.score) + '">' + e.score + '</span></td><td class="num">' + (RES[e.res] ? '<span class="res ' + RES[e.res][1] + '">' + RES[e.res][0] + '</span>' : '') + '</td><td class="muted">' + esc(e.act || '') + '</td></tr>').join('') + '</tbody></table></div></div>';
+}
 function renderTrack() {
   const el = $('#view-track'), log = (state.index.picksLog || []).slice().sort((a, b) => b.ts - a.ts);
   if (state.tlg && state.tlg !== 'all') { renderLeagueView(el); return; }
-  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '><p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
+  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '><p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
   { // ⚽ כדורגל לפי ליגה: איפה ההמלצות עובדות יותר ואיפה פחות (כל ההמלצות על משחקים, לא רק הנבחרות של היום)
     const D = state.index.detail || {}, byLg = D.byLeague || {}, byLT = D.byLeagueType || {};
     const dn = x => x.win + x.lose, keys = Object.keys(byLg).filter(k => dn(byLg[k]) > 0).sort((x, y) => (byLg[y].win / dn(byLg[y])) - (byLg[x].win / dn(byLg[x])) || dn(byLg[y]) - dn(byLg[x]));

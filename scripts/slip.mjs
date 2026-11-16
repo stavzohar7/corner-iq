@@ -192,7 +192,7 @@ export function totalOdds(legs) { const live = legs.filter(l => l.res !== 'push'
 function gradeOne(S, footDay, bbDay) {
   for (const l of S.legs) { const r = legRes(l, footDay, bbDay); if (r) { l.res = r.res; l.act = r.act; } }
   S.total = S.legs.length ? totalOdds(S.legs) : null;
-  S.res = S.legs.some(l => l.res === 'lose') ? 'lose' : S.legs.length && S.legs.every(l => l.res) ? 'win' : null;
+  S.res = S.legs.some(l => l.res === 'lose') ? 'lose' : S.legs.length && S.legs.every(l => l.res) ? (S.legs.every(l => l.res === 'push') ? 'push' : 'win') : null;
   return S;
 }
 export const slipsOf = day => [...LEVELS.flatMap(lv => SPORTS.map(sp => ({ level: lv, sport: sp, S: day.k[lv][sp] }))), ...(day.k.win || []).map(S => ({ level: 'win', sport: 'f', S })), ...(day.k.lg || []).map(S => ({ level: 'lg', sport: 'f', S }))];

@@ -495,3 +495,5 @@ details.legend { margin: 6px 0 14px; font-size: 13px; color: var(--muted); } det
   .dayStrip .chips { flex-wrap: wrap; }
 }
 @media (min-width: 1300px) { main, .topin, .tabs, #banners, .foot { max-width: 1240px; } }
+
+.daySum { margin-bottom: 12px; } .daySum h4 { margin: 0 0 8px; } .daySum .kpis { margin: 0; } .daySum small { color: var(--muted); }
