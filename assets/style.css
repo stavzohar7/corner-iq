@@ -557,3 +557,6 @@ h2 { font-size: 21px; } h3.secTitle { font-size: 17px; margin: 18px 0 8px; }
 .shareBtn { width: 100%; margin-top: 8px; min-height: 40px; }
 .nextKo { margin: 10px 2px 0; font-size: 14px; }
 .lgBar { margin: 0 0 10px; }
+
+.luTag { margin-top: 3px; font-size: 12.5px; color: var(--muted); } .luTag.ok { color: #7ee2a8; } .luTag.wait { color: #f0c66a; }
+[data-theme="light"] .luTag.ok { color: #0f6b38; } [data-theme="light"] .luTag.wait { color: #8a5d00; }

@@ -214,9 +214,18 @@ const stBadge = st => st === 'upcoming' ? '<span class="tag">🕒 עוד לא ה
 const SPORT_ICON = { f: '⚽', b: '🏀', n: '🏀', e: '🏀' };
 async function openBB(date, id) { await bbLoad(date); location.hash = 'bb-' + id; }
 window.openBB = openBB;
+// בדיקת לפני משחק: האם ההרכבים כבר רשמיים, וכמה חיסורים ידועים (כדורגל, ליום שמוצג)
+function lineupInfo(d, l) {
+  if (l.sport !== 'f' || !state.day || state.day.date !== d.date || l.res) return null;
+  const f = findFx(l.id); if (!f || f.result || f.ts < nowS() - 300) return null;
+  const n = f.news; if (!n) return { ok: false, txt: '👥 עוד אין הרכבים. כדאי לבדוק שעה לפני' };
+  const conf = n.lineups && n.lineups.h && n.lineups.a && n.lineups.h.confirmed && n.lineups.a.confirmed;
+  const out = (n.items || []).filter(i => i.impact === 'high' || i.impact === 'medium').length;
+  return { ok: !!conf, txt: (conf ? '👥 הרכבים רשמיים ✅' : '👥 הרכב צפוי, לא סופי. כדאי לבדוק שעה לפני') + (out ? ' · 🚑 ' + out + ' חיסורים חשובים' : '') };
+}
 function slipLegHtml(d, l, n, best) {
   const click = l.sport === 'f' ? "openMatchOf('" + d.date + "','" + String(l.id).replace(/'/g, '') + "')" : "openBB('" + d.date + "'," + l.id + ")";
-  return '<div class="slipLeg' + (l.res ? ' fin-' + l.res : '') + '" onclick="' + click + '"><span class="rank">' + n + '</span><div class="slipMain"><div class="plabel">' + esc(l.label) + '</div><div class="pmeta">' + SPORT_ICON[l.sport] + ' ' + esc(l.game) + ' · ' + fmtTime(l.ts) + (new Date(l.ts * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }) > d.date ? ' 🌙 (בלילה, נספר ליום הזה)' : '') + (l.res ? ' · ' + RES[l.res][0] + (l.act ? ' (' + l.act + ')' : '') : '') + (best ? ' · <span class="bestTag">⭐ הכי בטוחה בטופס</span>' : '') + '</div>' + '</div><span class="oddsTag">' + l.odds.toFixed(2) + '</span>' + (l.res || l.src === 'fivebet' ? '' : '<input class="siteOdds" type="number" step="0.01" min="1.01" inputmode="decimal" placeholder="יחס באתר שלך" value="' + esc(store.get('ciq-so-' + d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) || '') + '" data-k="' + esc(d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) + '" data-o="' + l.odds + '" onclick="event.stopPropagation()">') + '</div>';
+  return '<div class="slipLeg' + (l.res ? ' fin-' + l.res : '') + '" onclick="' + click + '"><span class="rank">' + n + '</span><div class="slipMain"><div class="plabel">' + esc(l.label) + '</div><div class="pmeta">' + SPORT_ICON[l.sport] + ' ' + esc(l.game) + ' · ' + fmtTime(l.ts) + (new Date(l.ts * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }) > d.date ? ' 🌙 (בלילה, נספר ליום הזה)' : '') + (l.res ? ' · ' + RES[l.res][0] + (l.act ? ' (' + l.act + ')' : '') : '') + (best ? ' · <span class="bestTag">⭐ הכי בטוחה בטופס</span>' : '') + (() => { const u = lineupInfo(d, l); return u ? '<div class="luTag ' + (u.ok ? 'ok' : 'wait') + '">' + u.txt + '</div>' : ''; })() + '</div>' + '</div><span class="oddsTag">' + l.odds.toFixed(2) + '</span>' + (l.res || l.src === 'fivebet' ? '' : '<input class="siteOdds" type="number" step="0.01" min="1.01" inputmode="decimal" placeholder="יחס באתר שלך" value="' + esc(store.get('ciq-so-' + d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) || '') + '" data-k="' + esc(d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) + '" data-o="' + l.odds + '" onclick="event.stopPropagation()">') + '</div>';
 }
 function recalcSite(card) {
   const ins = [...card.querySelectorAll('.siteOdds')], el = card.querySelector('.siteTotal'); if (!el || !ins.length) return;
@@ -846,7 +855,7 @@ function weekHtml(ws, compact) {
   return html + '</div>';
 }
 const trTab = () => state.trSub || 'slips', hid = k => trTab() === k ? '' : ' hidden';
-const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
+const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['learn', '🧠 מה למדנו'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
 function weekPanel() {
   const wl = weekList(); if (!wl.length) return '<div class="empty">עוד אין נתונים לסיכום.</div>';
   const cur = state.wk && wl.includes(state.wk) ? state.wk : wl[0];
@@ -895,6 +904,14 @@ function splitPanel() {
   return '<div class="card"><h4>🏟 לפי ליגה: מה נכנס לטופס ומה נשאר בהמלצות בודדות</h4><p class="sub2">לכל ליגה שהימרנו בה: כמה הימורים <b>נתפסו מתוך כמה שנגמרו</b>. ⭐ = ההימורים בטופס החזק. 📋 = בטפסים אחרים (שני / שעות / קבוע). 🎯 = ההמלצה הטובה של המשחק שלא נכנסה לאף טופס. הימור שחוזר בכמה טפסים נספר פעם אחת.</p><div class="tblWrap"><table>' + head('ליגה') + '<tbody>' + keys.map(k => line(lgLabel(k), rows[k])).join('') + line('כל הליגות', all, 'avgRow') + '</tbody></table></div></div>' +
     '<div class="card"><h4>⚽ כדורגל לפי סוג הימור</h4><div class="tblWrap"><table>' + head('סוג הימור') + '<tbody>' + tk.map(t => line(TYPE_NAME[t] || t, typeRows[t])).join('') + '</tbody></table></div></div>';
 }
+// "מה למדנו מהתוצאות": הלקחים שהמערכת מחשבת לבד מכל ההימורים שנגמרו
+async function fillLearn() {
+  const box = $('#learnBox'); if (!box) return;
+  let L; try { L = await getJson('data/lessons.json'); } catch (e) { box.innerHTML = '<div class="empty">עדיין אין לקחים.</div>'; return; }
+  const nice = t => t.replace(/(d+)%/g, (m, n) => 'כ-' + Math.round(n / 10) + ' מתוך 10').replace(/\b(c|g|sh|sot|c1|th|total|home|away)\|[a-z0-9|.]+/gi, '').replace(/\(למשל "([^"]+)"\)/g, '— $1').replace(/\s{2,}/g, ' ').trim();
+  box.innerHTML = '<p class="sub2">מה המערכת למדה מכל ההימורים שנגמרו: איפה היא פוגעת יותר ממה שציפתה ואיפה פחות. היא משתמשת בזה כדי להוריד או להעלות ציונים. מתעדכן אחרי כל הרצה.</p>' +
+    L.sections.map(s => '<div class="card"><h4>' + esc(s.title) + '</h4><ul class="notes">' + s.lines.map(x => '<li>' + esc(nice(x)) + '</li>').join('') + '</ul></div>').join('');
+}
 function singlesPanel() {
   const log = (state.index.matchLog || []).slice().sort((a, b) => b.ts - a.ts), done = log.filter(e => e.res), isW = r => r.includes('win'), isL = r => r.includes('lose');
   if (!done.length) return '<div class="empty">עדיין אין המלצות בודדות שנגמרו.</div>';
@@ -913,7 +930,7 @@ function singlesPanel() {
 function renderTrack() {
   const el = $('#view-track'), log = (state.index.picksLog || []).slice().sort((a, b) => b.ts - a.ts);
   if (state.tlg && state.tlg !== 'all') { renderLeagueView(el); return; }
-  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '>' + splitPanel() + '<p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
+  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="learn"' + hid('learn') + '><div id="learnBox"><div class="empty">טוען...</div></div></section><section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '>' + splitPanel() + '<p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
   { // ⚽ כדורגל לפי ליגה: איפה ההמלצות עובדות יותר ואיפה פחות (כל ההמלצות על משחקים, לא רק הנבחרות של היום)
     const D = state.index.detail || {}, byLg = D.byLeague || {}, byLT = D.byLeagueType || {};
     const dn = x => x.win + x.lose, keys = Object.keys(byLg).filter(k => dn(byLg[k]) > 0).sort((x, y) => (byLg[y].win / dn(byLg[y])) - (byLg[x].win / dn(byLg[x])) || dn(byLg[y]) - dn(byLg[x]));
@@ -951,7 +968,7 @@ function renderTrack() {
     list.map(e => { const r = e.res ? RES[e.res] : null, st = statusOfLog(e); return '<tr class="clk" onclick="openMatchOf(\'' + e.d + '\',\'' + String(e.id).replace(/'/g, '') + '\')"><td>' + fmtShort(e.d) + '</td><td>' + bd(e.h) + ' – ' + bd(e.a) + '</td><td>' + (TYPE_NAME[e.t] || '').split(' ')[0] + ' ' + esc(e.label) + '</td><td class="num"><span class="score ' + scoreCls(e.score) + '">' + e.score + '</span></td><td class="num">' + (e.price ? e.price.toFixed(2) : '—') + '</td><td class="num">' + (r ? '<span class="res ' + r[1] + '">' + r[0] + '</span>' : st === 'upcoming' ? '🕒 ' + fmtTime(e.ts) : '⏳') + '</td><td>' + esc(e.act || '') + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted" style="margin-top:10px">אין המלצות במצב הזה.</p>') + '</div>';
   html += '</section>';
   el.innerHTML = html;
-  fillSlipHist();
+  fillSlipHist(); fillLearn();
   bindSf(renderTrack);
   el.querySelectorAll('[data-trsub]').forEach(b => b.onclick = () => { state.trSub = b.dataset.trsub; renderTrack(); });
   el.querySelectorAll('[data-wk]').forEach(b => b.onclick = () => { state.wk = b.dataset.wk; renderTrack(); });

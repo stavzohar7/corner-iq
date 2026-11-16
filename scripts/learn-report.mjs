@@ -75,6 +75,13 @@ export function runLearnReport({ root = ROOT, log = () => {} } = {}) {
   fs.mkdirSync(path.join(root, 'data', 'knowledge'), { recursive: true });
   fs.writeFileSync(path.join(root, 'data', 'knowledge', 'calibration.json'), JSON.stringify(out));
   fs.writeFileSync(path.join(root, 'data', 'knowledge', 'lessons.md'), md.join('\n'));
+  // גרסה לאתר: חלקים לפי כותרת, בלי תווי כיוון נסתרים
+  { const sections = []; let cur = null;
+    for (const line of md.join('\n').split('\n')) {
+      const h = line.match(/^## (.+)/); if (h) { cur = { title: h[1], lines: [] }; sections.push(cur); continue; }
+      if (cur && line.trim()) cur.lines.push(line.replace(/^- /, '').replace(/[\u2066-\u2069\u200e\u200f]/g, ''));
+    }
+    fs.writeFileSync(path.join(root, 'data', 'lessons.json'), JSON.stringify({ updated: new Date().toISOString(), sections })); }
   log(`לקחים: כדורגל ${out.sports.f.total ? out.sports.f.total.n : 0} הימורים (נבחרות ${out.sports.n.total ? out.sports.n.total.n : 0}), כדורסל ${out.sports.b.total ? out.sports.b.total.n : 0}`);
   return out;
 }
