@@ -551,3 +551,9 @@ h2 { font-size: 21px; } h3.secTitle { font-size: 17px; margin: 18px 0 8px; }
 @media (max-width: 760px) { .daybox { flex-direction: row; align-items: center; gap: 6px; } #updated { display: none; } .foot .updLine { display: block; } }
 [data-theme="light"] .tab.active, [data-theme="light"] .tab.active .tl, [data-theme="light"] .tab.active .ti { color: #0b3a75 !important; font-weight: 700; opacity: 1; }
 [data-theme="light"] .tab { color: #46453c; }
+
+.warnB { background: #4a3a10; color: #ffe29a; border-color: #8a6a1c; }
+[data-theme="light"] .warnB { background: #fff3cd; color: #6b4a00; border-color: #e6c35c; }
+.shareBtn { width: 100%; margin-top: 8px; min-height: 40px; }
+.nextKo { margin: 10px 2px 0; font-size: 14px; }
+.lgBar { margin: 0 0 10px; }

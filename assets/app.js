@@ -74,7 +74,8 @@ async function loadDay(date) {
   state.day = await getJson('data/days/' + date + '.json'); if (typeof bb !== 'undefined' && bb.idx && bb.idx.days.some(x => x.date === date && x.games) && bb.date !== date) { bb.date = null; }
   const d = state.day;
   $('#updated').textContent = 'עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt });
-  $('#banners').innerHTML = (d.notes || []).map(n => '<div class="banner">' + esc(n) + '</div>').join('');
+  { const ageH = (Date.now() - new Date(d.updated).getTime()) / 3600e3, isToday = date >= ilToday(), stale = isToday && ageH > 3 ? '<div class="banner warnB">⚠️ הנתונים עודכנו לפני ' + (ageH < 24 ? Math.round(ageH) + ' שעות' : Math.round(ageH / 24) + ' ימים') + '. ייתכן שחלק מהתוצאות וההרכבים לא מעודכנים. העדכון האוטומטי רץ כל שעה, ואם הוא נתקע זה יתוקן בהרצה הבאה.</div>' : '';
+    $('#banners').innerHTML = stale + (d.notes || []).map(n => '<div class="banner">' + esc(n) + '</div>').join(''); }
   const mt = d.meta || {};
   $('#srcLine').textContent = mt.fd ? 'מקורות: football-data.co.uk (' + mt.fd + ' משחקי עונה) · 365Scores (' + mt.s365 + ' משחקים, מהם ' + mt.h1 + ' עם נתוני מחצית) · התאמה בין המקורות בקרנות: ' + mt.same + ' מתוך ' + mt.checked : '';
   { const sl = $('#srcLine'); sl.textContent = '🕒 עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt }) + (sl.textContent ? ' · ' + sl.textContent : ''); }
@@ -150,13 +151,20 @@ function dayChips() {
   }).join('') + '</div><span class="muted dayHint">ימים ישנים יותר: בתפריט שבראש העמוד</span></div>';
 }
 // סיכום של היום שנבחר, על אותו יום בלבד: טפסים והמלצות בודדות
+function nextKickoff(date) {
+  if (!state.day || state.day.date !== date) return '';
+  const up = state.day.fixtures.filter(f => !f.result && f.ts > nowS()).sort((a, b) => a.ts - b.ts)[0];
+  if (!up) return '';
+  const m = Math.round((up.ts - nowS()) / 60), when = m < 60 ? 'בעוד ' + m + ' דקות' : m < 1440 ? 'בעוד ' + Math.floor(m / 60) + ' שעות ו-' + (m % 60) + ' דקות' : fmtDate(up.ts);
+  return '<p class="nextKo">⏱ <b>המשחק הבא:</b> ' + bd(up.home.name) + ' – ' + bd(up.away.name) + ' · ' + fmtTime(up.ts) + ' (' + when + ')</p>';
+}
 function daySummary(date) {
   const st = slipDayStat(date), L = (state.index.matchLog || []).filter(e => e.d === date), done = L.filter(e => e.res), w = done.filter(e => e.res.includes('win')).length, l = done.filter(e => e.res.includes('lose')).length;
   if (!st && !L.length) return '';
   const cell = (t, a, b) => '<div class="kpi"><b>' + a + '</b><span>' + t + (b ? '<br><small>' + b + '</small>' : '') + '</span></div>';
   return '<div class="card daySum"><h4>📌 סיכום ' + dayName(date) + ' <span class="muted">· ' + fmtShort(date) + ', רק משחקים של היום הזה</span></h4><div class="kpis">' +
     (st ? cell('טפסים', st.w + ' מתוך ' + st.n, st.w + st.l < st.n ? (st.n - st.w - st.l) + ' עוד ממתינים' : 'כולם נגמרו') : '') +
-    (L.length ? cell('המלצות בודדות (משחק אחד = המלצה אחת)', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div></div>';
+    (L.length ? cell('המלצות בודדות (משחק אחד = המלצה אחת)', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div>' + nextKickoff(date) + '</div>';
 }
 // סיכום "מה קרה ביום האחרון שנגמר": כל טופס ואיך הוא יצא
 function recapHtml(date) {
@@ -224,11 +232,20 @@ function bindSiteOdds(root) {
 async function loadSlips() { if (!state.slips) { try { state.slips = await getJson('data/slips.json'); } catch (e) { state.slips = { days: [] }; } } return state.slips; }
 const SLIP_LV = [['strong', 'הטופס החזק', ''], ['second', 'הטופס השני', 'slip2']], SLIP_SP = [['f', '⚽ כדורגל'], ['n', '🏀 NBA'], ['e', '🏀 יורוליג']];
 const slipAt = (s, lv, sp) => (s.k[lv] && s.k[lv][sp]) || { legs: [] };
+function slipShareText(d, S, title) {
+  const L = S.legs.map((l, i) => (i + 1) + '. ' + l.label + ' (' + l.game + ', ' + fmtTime(l.ts) + ') יחס ' + l.odds.toFixed(2)).join('\n');
+  return '🚩 קורנר IQ · ' + title + ' · ' + fmtShort(d.date) + '\n' + L + '\nיחס כולל ' + S.total.toFixed(2) + '\n' + SITE_URL;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('.shareBtn'); if (!b) return;
+  const t = b.dataset.t;
+  if (navigator.share) navigator.share({ text: t }).catch(() => {}); else window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
+});
 function slipCardHtml(d, S, title, sub, cls) {
   const prob = S.legs.reduce((a, l) => a * (l.p > 0 ? l.p : 0.6), 1), once = Math.max(2, Math.round(1 / prob)), whys = S.legs.filter(l => l.why), bestLeg = S.legs.some(l => l.p > 0) ? S.legs.reduce((a, l) => (l.p || 0) > (a.p || 0) ? l : a, S.legs[0]) : null;
   return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + '"><h3>' + title + ' <span class="muted">' + sub + '</span></h3>' + S.legs.map((l, i) => slipLegHtml(d, l, i + 1, bestLeg === l)).join('') +
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
-    '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><div class="siteTotal"></div><p class="muted slipFoot">100 ₪ משלמים ' + Math.round(100 * S.total) + ' ₪ · נתפס בערך פעם ב-' + once + ' טפסים' + (S.res === 'win' ? ' · <b class="pos">נתפס ✅</b>' : S.res === 'lose' ? ' · <b class="neg">נפל ❌</b>' : '') + '</p></div>';
+    '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="siteTotal"></div><p class="muted slipFoot">100 ₪ משלמים ' + Math.round(100 * S.total) + ' ₪ · נתפס בערך פעם ב-' + once + ' טפסים' + (S.res === 'win' ? ' · <b class="pos">נתפס ✅</b>' : S.res === 'lose' ? ' · <b class="neg">נפל ❌</b>' : '') + '</p></div>';
 }
 function slipsHtml(s, sp) {
   if (!s || !s.k) return '';
@@ -269,10 +286,13 @@ async function fillToday(date) {
   html += '<h3 class="secTitle">📋 הטפסים · ' + spName + '</h3>' + (slipsHtml(s, sp) || '<div class="empty">אין היום טופס ' + SP_IN[sp] + '. טופס נבנה רק כשיש 3 הימורים חזקים.</div>');
   if (sp === 'f') {
     const MP = (d.matchPicks || []).map(p => { const f = findFx(p.fid); return f && f.markets[p.mi] ? { f, m: f.markets[p.mi], i: idxOf(p.fid) } : null; }).filter(Boolean).sort((a, b) => a.f.ts - b.f.ts);
-    const noMk = d.fixtures.filter(f => !MP.some(x => x.f === f)).sort((a, b) => a.ts - b.ts);
+    const lgIds = [...new Set(d.fixtures.map(f => f.lg))], glg = lgIds.includes(Number(state.glg)) ? Number(state.glg) : 'all';
+    const lgBar = lgIds.length > 1 ? '<div class="chips lgBar"><button class="chip' + (glg === 'all' ? ' on' : '') + '" data-glg="all">כל הליגות</button>' + lgIds.map(id => '<button class="chip' + (glg === id ? ' on' : '') + '" data-glg="' + id + '">' + esc(leagueOf(id).he) + '</button>').join('') + '</div>' : '';
+    if (glg !== 'all') { for (let k = MP.length - 1; k >= 0; k--) if (MP[k].f.lg !== glg) MP.splice(k, 1); }
+    const noMk = d.fixtures.filter(f => !MP.some(x => x.f === f) && (glg === 'all' || f.lg === glg)).sort((a, b) => a.ts - b.ts);
     if (MP.length || noMk.length) {
       const gw = MP.filter(x => x.m.res && x.m.res.includes('win')).length, gl = MP.filter(x => x.m.res && x.m.res.includes('lose')).length;
-      html += '<h3 class="secTitle">🗂 כל משחקי היום: ההמלצה הטובה ביותר לכל משחק' + (gw + gl ? ' <span class="muted">· נתפסו ' + gw + ' · נפלו ' + gl + '</span>' : '') + '</h3><p class="srcNote">לכל משחק בליגות שלנו יש כאן המלצה אחת, גם אם היא לא נכנסה לטפסים. ציון 6 ומעלה = המלצה טובה, מתחת ל-6 = חלשה, לעיון בלבד. לחיצה פותחת את המשחק.</p><div class="srows">' + MP.map(x => singleRow(x.f, x.m, x.i)).join('') + noMk.map(f => '<div class="srow" onclick="openMatch(' + idxOf(f.id) + ')"><span class="score s-lo">–</span><div class="smain"><div class="plabel">אין עדיין המלצה</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div><div class="muted">חסרים נתונים או יחסים. מתעדכן אוטומטית כל שעה.</div></div></div>').join('') + '</div>';
+      html += '<h3 class="secTitle">🗂 כל משחקי היום: ההמלצה הטובה ביותר לכל משחק' + (gw + gl ? ' <span class="muted">· נתפסו ' + gw + ' · נפלו ' + gl + '</span>' : '') + '</h3><p class="srcNote">לכל משחק בליגות שלנו יש כאן המלצה אחת, גם אם היא לא נכנסה לטפסים. ציון 6 ומעלה = המלצה טובה, מתחת ל-6 = חלשה, לעיון בלבד. לחיצה פותחת את המשחק.</p>' + lgBar + '<div class="srows">' + MP.map(x => singleRow(x.f, x.m, x.i)).join('') + noMk.map(f => '<div class="srow" onclick="openMatch(' + idxOf(f.id) + ')"><span class="score s-lo">–</span><div class="smain"><div class="plabel">אין עדיין המלצה</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div><div class="muted">חסרים נתונים או יחסים. מתעדכן אוטומטית כל שעה.</div></div></div>').join('') + '</div>';
     }
   }
   const L = singles[sp], LIM = state.allPicks === sp ? 999 : 8, isW = r => r && r.includes('win'), isL = r => r && r.includes('lose');
@@ -280,6 +300,7 @@ async function fillToday(date) {
   html += '<h3 class="secTitle">🎯 המלצות בודדות · ' + spName + (w + l ? ' <span class="muted">· נתפסו ' + w + ' · נפלו ' + l + '</span>' : '') + '</h3><p class="srcNote">כל המלצה כאן עומדת לבד ואינה חלק מטופס. היחסים כאן של Bet365, לעיון.</p>';
   html += L.length ? '<div class="srows">' + L.slice(0, LIM).map(x => sp === 'f' ? singleRow(x.f, x.m, x.i) : bbSingleRow(date, x.g, x.m)).join('') + '</div>' + (L.length > LIM ? '<div class="more"><button class="btn" id="showAllPicks">הצג את כל ' + L.length + ' ההמלצות</button></div>' : '') : '<div class="empty">אין היום המלצות בודדות ' + SP_IN[sp] + ' שעוברות את הרף.</div>';
   box.innerHTML = html;
+  box.querySelectorAll('[data-glg]').forEach(b => b.onclick = () => { state.glg = b.dataset.glg; fillToday(date); });
   box.querySelectorAll('[data-slipsp]').forEach(b => b.onclick = () => { state.slipSp = b.dataset.slipsp; fillToday(date); });
   const sa = $('#showAllPicks'); if (sa) sa.onclick = () => { state.allPicks = sp; fillToday(date); };
   bindSiteOdds(box);
