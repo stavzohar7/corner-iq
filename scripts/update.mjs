@@ -390,7 +390,7 @@ async function main() {
       if (!m) continue;
       picksLog.push({ d: d.date, id: fx.id, h: fx.home.name, a: fx.away.name, lg: fx.lg, ts: fx.ts, t: tkey(m), label: m.label, score: m.score, price: m.odds || m.estOdds || null, real: !!m.odds, res: m.res || null, act: m.actT || footAct(fx, m) });
     }
-    for (const f of day.fixtures) { const mi = bestIdx(f), m = mi >= 0 && f.markets[mi]; if (!m) continue; matchLog.push({ d: d.date, id: f.id, h: f.home.name, a: f.away.name, lg: f.lg, ts: f.ts, t: tkey(m), label: m.label, score: m.score, price: m.odds || null, res: m.res || null, act: m.actT || footAct(f, m) }); }
+    for (const f of day.fixtures) { const mi = bestIdx(f), m = mi >= 0 && f.markets[mi]; if (!m) continue; matchLog.push({ d: d.date, id: f.id, h: f.home.name, a: f.away.name, lg: f.lg, ts: f.ts, t: tkey(m), kind: [m.stat, m.group, m.side].join('|'), label: m.label, score: m.score, price: m.odds || null, res: m.res || null, act: m.actT || footAct(f, m) }); }
     d.games = games; d.picks = picks; d.graded = day.fixtures.filter(x => x.graded).length;
     if (changed && d.date !== today) writeJson(f, day);
   }

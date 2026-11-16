@@ -33,7 +33,27 @@ const store = {
 async function getJson(url) { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(url); return r.json(); }
 
 // ================= אתחול וניווט =================
+// ---- נגישות: גודל טקסט ומצב כהה/בהיר, נשמרים בין ביקורים ----
+function applyA11y() {
+  const fs = Number(store.get('ciq-fs') || 0), th = store.get('ciq-th') || 'dark';
+  document.body.style.zoom = [1, 1.12, 1.25][fs] || 1;
+  document.documentElement.dataset.theme = th;
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = th === 'light' ? '#f6f5f1' : '#101112';
+}
+function initA11y() {
+  applyA11y();
+  $('#fsBtn').onclick = () => { store.set('ciq-fs', String((Number(store.get('ciq-fs') || 0) + 1) % 3)); applyA11y(); };
+  $('#thBtn').onclick = () => { store.set('ciq-th', (store.get('ciq-th') || 'dark') === 'dark' ? 'light' : 'dark'); applyA11y(); };
+}
+const GUIDE = '<details class="card guide"><summary>❓ איך קוראים את האתר (30 שניות)</summary><ul class="notes">' +
+  '<li><b>הציון (1 עד 10)</b> = כמה ההימור חזק לפי הניתוח שלנו. <span class="score s-hi">7</span> ומעלה חזק, <span class="score s-mid">5-6</span> בינוני, מתחת לזה חלש.</li>' +
+  '<li><b>הטופס החזק</b> = שלושת ההימורים הכי בטוחים של היום, בשלושה משחקים שונים. הוא נפסל אם הימור אחד נופל. <b>הטופס השני</b> = חזק פחות, אבל יחס גבוה יותר.</li>' +
+  '<li><b>המלצה בודדת</b> = הימור אחד על משחק אחד, לא קשור לטפסים.</li>' +
+  '<li><b>הסימנים:</b> ✅ נתפס · ❌ נפל · ⏳ עדיין לא נגמר · ↩ הוחזר.</li>' +
+  '<li><b>"x מתוך y"</b> = כמה נתפסו מתוך אלה שכבר נגמרו.</li>' +
+  '<li><b>יחס</b> = כמה משלמים על כל שקל. יחס Bet365 הוא לעיון, תבדוק תמיד את היחס באתר שלך.</li></ul></details>';
 async function init() {
+  initA11y();
   try { state.index = await getJson('data/days/index.json'); }
   catch (e) { $('#view-today').innerHTML = '<div class="empty">עדיין אין נתונים. העדכון היומי הראשון ייצור אותם.</div>'; return; }
   const sel = $('#daySel');
@@ -57,6 +77,7 @@ async function loadDay(date) {
   $('#banners').innerHTML = (d.notes || []).map(n => '<div class="banner">' + esc(n) + '</div>').join('');
   const mt = d.meta || {};
   $('#srcLine').textContent = mt.fd ? 'מקורות: football-data.co.uk (' + mt.fd + ' משחקי עונה) · 365Scores (' + mt.s365 + ' משחקים, מהם ' + mt.h1 + ' עם נתוני מחצית) · התאמה בין המקורות בקרנות: ' + mt.same + ' מתוך ' + mt.checked : '';
+  { const sl = $('#srcLine'); sl.textContent = '🕒 עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt }) + (sl.textContent ? ' · ' + sl.textContent : ''); }
   route();
 }
 function goTab(t) { state.tab = t; if (location.hash) location.hash = ''; else route(); }
@@ -292,7 +313,7 @@ function singleRow(f, m, i) {
 function renderToday() {
   const el = $('#view-today'), d = state.day;
   const isLatest = state.day.date === state.index.days[0].date, sunday = isLatest && new Date(ilToday() + 'T00:00:00Z').getUTCDay() === 0;
-  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + dayChips() + daySummary(state.day.date) + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + '<div id="todayBody"><div class="empty">טוען...</div></div>';
+  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + GUIDE + dayChips() + daySummary(state.day.date) + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + '<div id="todayBody"><div class="empty">טוען...</div></div>';
   bindDayChips(); fillToday(d.date);
 }
 function keyMatchesHtml(d) {
@@ -804,11 +825,54 @@ function weekHtml(ws, compact) {
   return html + '</div>';
 }
 const trTab = () => state.trSub || 'slips', hid = k => trTab() === k ? '' : ' hidden';
-const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['week', '📅 סיכום שבועי'], ['recs', '⚽ המלצות לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
+const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
 function weekPanel() {
   const wl = weekList(); if (!wl.length) return '<div class="empty">עוד אין נתונים לסיכום.</div>';
   const cur = state.wk && wl.includes(state.wk) ? state.wk : wl[0];
   return '<div class="chips" style="margin-bottom:10px">' + wl.map(w => '<button class="chip' + (w === cur ? ' on' : '') + '" data-wk="' + w + '">' + wkLabel(w) + '</button>').join('') + '</div>' + weekHtml(cur, false);
+}
+// ---- סטטיסטיקה לפי ליגה: בטופס החזק / בטפסים אחרים / בהמלצות בודדות שלא נכנסו לטופס ----
+function leagueSplit() {
+  const S = state.slips && state.slips.days || [], idx = state.index, idLg = new Map();
+  for (const e of [...(idx.matchLog || []), ...(idx.picksLog || []), ...(idx.leagueLog || [])]) idLg.set(String(e.id), e.lg);
+  const rows = {}, cat = { strong: 'שלט', other: 'אחר', single: 'בודד' };
+  const isDone = r => r === 'win' || r === 'lose' || (r && (r.includes('win') || r.includes('lose')));
+  const bump = (lgKey, type, c, res) => {
+    for (const [obj, k] of [[rows, lgKey]]) { const r = obj[k] ||= { strong: { w: 0, l: 0, p: 0 }, other: { w: 0, l: 0, p: 0 }, single: { w: 0, l: 0, p: 0 }, types: {} }; const x = r[c]; if (res && res.includes('win')) x.w++; else if (res && res.includes('lose')) x.l++; else if (!res) x.p++; }
+  };
+  const typeRows = {}, bumpT = (t, c, res) => { const r = typeRows[t] ||= { strong: { w: 0, l: 0, p: 0 }, other: { w: 0, l: 0, p: 0 }, single: { w: 0, l: 0, p: 0 } }; const x = r[c]; if (res && res.includes('win')) x.w++; else if (res && res.includes('lose')) x.l++; else if (!res) x.p++; };
+  const legType = l => /^g\|(1x2|dc)\|/.test(l.kind || '') ? 'res' : (l.stat || String(l.kind || '').split('|')[0]);
+  const inSlip = new Set(), bbInSlip = new Set(), seen = new Set();
+  const lgOfLeg = l => l.sport === 'n' ? 'nba' : l.sport === 'e' ? 'el' : String(l.lg != null ? l.lg : (idLg.get(String(l.id)) != null ? idLg.get(String(l.id)) : '?'));
+  for (const pass of ['strong', 'other']) for (const d of S) {
+    if (!d.k) continue;
+    const lists = pass === 'strong' ? ['f', 'n', 'e'].map(sp => slipAt(d, 'strong', sp)) : [...['f', 'n', 'e'].map(sp => slipAt(d, 'second', sp)), ...(d.k.win || []), ...(d.k.lg || [])];
+    for (const X of lists) for (const l of X.legs || []) {
+      const key = d.date + '|' + l.id + '|' + (l.kind || l.key), sp = l.sport || 'f';
+      if (sp === 'f') inSlip.add(d.date + '|' + l.id + '|' + l.kind); else bbInSlip.add(d.date + '|' + l.id + '|' + l.label);
+      if (seen.has(key)) continue; seen.add(key);
+      bump(lgOfLeg(l), null, pass, l.res || null);
+      if (sp === 'f') bumpT(legType(l), pass, l.res || null);
+    }
+  }
+  for (const e of idx.matchLog || []) { if (inSlip.has(e.d + '|' + e.id + '|' + e.kind)) continue; bump(String(e.lg), null, 'single', e.res); bumpT(e.t, 'single', e.res); }
+  for (const e of (bb.idx && bb.idx.picksLog) || []) { if (bbInSlip.has(e.d + '|' + e.id + '|' + e.label)) continue; bump(e.comp === 103 ? 'nba' : 'el', null, 'single', e.res); }
+  return { rows, typeRows };
+}
+const lgLabel = k => k === 'nba' ? '🏀 NBA' : k === 'el' ? '🏀 יורוליג' : k === '?' ? 'לא ידוע' : esc(leagueOf(Number(k)).he);
+function splitPanel() {
+  const { rows, typeRows } = leagueSplit();
+  const cell = x => (x.w + x.l ? '<b>' + x.w + ' מתוך ' + (x.w + x.l) + '</b>' : '<span class="muted">—</span>') + (x.p ? '<br><small class="muted">' + x.p + ' ממתינים</small>' : '');
+  const tot = r => ({ w: r.strong.w + r.other.w + r.single.w, l: r.strong.l + r.other.l + r.single.l, p: r.strong.p + r.other.p + r.single.p });
+  const head = first => '<thead><tr><th>' + first + '</th><th class="num">⭐ בטופס החזק</th><th class="num">📋 בטפסים אחרים</th><th class="num">🎯 בהמלצות בודדות (לא בטופס)</th><th class="num">סה״כ</th></tr></thead>';
+  const line = (name, r, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') + '><td>' + name + '</td><td class="num">' + cell(r.strong) + '</td><td class="num">' + cell(r.other) + '</td><td class="num">' + cell(r.single) + '</td><td class="num">' + cell(tot(r)) + '</td></tr>';
+  const keys = Object.keys(rows).sort((a, b) => { const n = k => rows[k].strong.w + rows[k].strong.l + rows[k].other.w + rows[k].other.l + rows[k].single.w + rows[k].single.l; return n(b) - n(a); });
+  if (!keys.length) return '';
+  const all = { strong: { w: 0, l: 0, p: 0 }, other: { w: 0, l: 0, p: 0 }, single: { w: 0, l: 0, p: 0 } };
+  for (const k of keys) for (const c of ['strong', 'other', 'single']) for (const f of ['w', 'l', 'p']) all[c][f] += rows[k][c][f];
+  const tk = Object.keys(typeRows).sort((a, b) => ['res', 'g', 'c', 'c1', 'sh', 'sot'].indexOf(a) - ['res', 'g', 'c', 'c1', 'sh', 'sot'].indexOf(b));
+  return '<div class="card"><h4>🏟 לפי ליגה: מה נכנס לטופס ומה נשאר בהמלצות בודדות</h4><p class="sub2">לכל ליגה שהימרנו בה: כמה הימורים <b>נתפסו מתוך כמה שנגמרו</b>. ⭐ = ההימורים בטופס החזק. 📋 = בטפסים אחרים (שני / שעות / קבוע). 🎯 = ההמלצה הטובה של המשחק שלא נכנסה לאף טופס. הימור שחוזר בכמה טפסים נספר פעם אחת.</p><div class="tblWrap"><table>' + head('ליגה') + '<tbody>' + keys.map(k => line(lgLabel(k), rows[k])).join('') + line('כל הליגות', all, 'avgRow') + '</tbody></table></div></div>' +
+    '<div class="card"><h4>⚽ כדורגל לפי סוג הימור</h4><div class="tblWrap"><table>' + head('סוג הימור') + '<tbody>' + tk.map(t => line(TYPE_NAME[t] || t, typeRows[t])).join('') + '</tbody></table></div></div>';
 }
 function singlesPanel() {
   const log = (state.index.matchLog || []).slice().sort((a, b) => b.ts - a.ts), done = log.filter(e => e.res), isW = r => r.includes('win'), isL = r => r.includes('lose');
@@ -828,7 +892,7 @@ function singlesPanel() {
 function renderTrack() {
   const el = $('#view-track'), log = (state.index.picksLog || []).slice().sort((a, b) => b.ts - a.ts);
   if (state.tlg && state.tlg !== 'all') { renderLeagueView(el); return; }
-  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '><p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
+  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '>' + splitPanel() + '<p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
   { // ⚽ כדורגל לפי ליגה: איפה ההמלצות עובדות יותר ואיפה פחות (כל ההמלצות על משחקים, לא רק הנבחרות של היום)
     const D = state.index.detail || {}, byLg = D.byLeague || {}, byLT = D.byLeagueType || {};
     const dn = x => x.win + x.lose, keys = Object.keys(byLg).filter(k => dn(byLg[k]) > 0).sort((x, y) => (byLg[y].win / dn(byLg[y])) - (byLg[x].win / dn(byLg[x])) || dn(byLg[y]) - dn(byLg[x]));

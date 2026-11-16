@@ -497,3 +497,57 @@ details.legend { margin: 6px 0 14px; font-size: 13px; color: var(--muted); } det
 @media (min-width: 1300px) { main, .topin, .tabs, #banners, .foot { max-width: 1240px; } }
 
 .daySum { margin-bottom: 12px; } .daySum h4 { margin: 0 0 8px; } .daySum .kpis { margin: 0; } .daySum small { color: var(--muted); }
+
+/* ---- נגישות ונוחות ---- */
+:root { --muted: #a3a299; }
+.muted { font-size: 13.5px; }
+:focus-visible { outline: 3px solid #ffd24a; outline-offset: 2px; border-radius: 6px; }
+button, .chip, .tab, select, .srow, .slipLeg, .tmCard, .kcard { -webkit-tap-highlight-color: transparent; }
+.chip, .btn { min-height: 40px; }
+.iconBtn { background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px; min-width: 42px; min-height: 36px; padding: 4px 10px; cursor: pointer; font-size: 15px; }
+.iconBtn:hover { background: var(--surface-3); }
+.guide { margin-bottom: 12px; } .guide summary { cursor: pointer; font-weight: 600; }
+.guide ul { margin: 10px 0 0; padding-inline-start: 18px; line-height: 1.9; }
+.guide .score { display: inline-flex; min-width: 24px; justify-content: center; padding: 0 6px; border-radius: 6px; font-size: 13px; }
+h2 { font-size: 21px; } h3.secTitle { font-size: 17px; margin: 18px 0 8px; }
+.srcNote, .sub2 { font-size: 13.5px; color: var(--text-2); line-height: 1.6; }
+@media (max-width: 760px) { body { font-size: 16px; } .daybox { gap: 6px; } }
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f5f1; --surface-1: #ffffff; --surface-2: #f0eee8; --surface-3: #e7e4dc; --line: #d8d4c8;
+  --text: #1d1c18; --text-2: #46453c; --muted: #66655b; --accent: #1f6fcf; --home: #1f6fcf; --away: #c25a22;
+}
+[data-theme="light"] .pos { color: #13753d; } [data-theme="light"] .neg { color: #b32626; }
+[data-theme="light"] .tab.active { color: #0b3a75; background: rgba(31,111,207,.12); }
+[data-theme="light"] .recap, [data-theme="light"] .card { box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+[data-theme="light"] .recapRow.fin-win { background: rgba(40,160,100,.1); } [data-theme="light"] .recapRow.fin-lose { background: rgba(200,60,60,.08); }
+[data-theme="light"] .top { background: var(--surface-1); }
+@media (max-width: 760px) {
+  .topin { padding: 8px 12px 4px; }
+  .daybox { flex-wrap: wrap; gap: 6px; row-gap: 2px; justify-content: flex-end; }
+  .daybox select { max-width: 138px; }
+  .iconBtn { min-width: 36px; min-height: 36px; padding: 2px 8px; }
+  #updated { flex-basis: 100%; text-align: end; font-size: 11.5px; }
+}
+/* מצב בהיר: מחליפים צבעים כהים שהיו קבועים */
+[data-theme="light"] body { background: var(--bg); }
+[data-theme="light"] .top { background: var(--surface-1); }
+[data-theme="light"] .chip.on, [data-theme="light"] .opt.on { background: #dcebff; color: #0b3a75; border-color: #1f6fcf; }
+[data-theme="light"] .chip.on small, [data-theme="light"] .chip.on b { color: #0b3a75; }
+[data-theme="light"] .oddsTag { background: #e6f0ff; border-color: #9cc0f0; color: #0b3a75; }
+[data-theme="light"] .res.win, [data-theme="light"] .res.halfwin, [data-theme="light"] .resStrip.win, [data-theme="light"] .opt.ok { background: #dff5e8; color: #0f6b38; }
+[data-theme="light"] .res.lose, [data-theme="light"] .res.halflose, [data-theme="light"] .resStrip.lose { background: #fde4e4; color: #a82424; }
+[data-theme="light"] .pill.s-hi { color: #0f6b38; } [data-theme="light"] .pill.s-mid { color: #8a5d00; } [data-theme="light"] .pill.s-lo { color: #a82424; }
+[data-theme="light"] .chk.ok { color: #0f6b38; } [data-theme="light"] .chk.bad { color: #8a5d00; }
+[data-theme="light"] .opinionCard { background: #f1f6ff; border-color: #bcd3f2; }
+[data-theme="light"] .heat.h3 { background: #bfe8cf; color: #0b3b20; } [data-theme="light"] .heat.h2 { background: #d4efdf; color: #134d2d; }
+@media (max-width: 760px) {
+  [data-theme="light"] .tabs { background: rgba(255,255,255,.97); border-top: 1px solid var(--line); }
+  .topin { flex-direction: column; align-items: stretch; gap: 6px; }
+  .daybox { flex-wrap: nowrap; justify-content: space-between; row-gap: 0; }
+  .daybox select { flex: 1; max-width: none; min-width: 0; }
+  #updated { order: 9; flex-basis: auto; font-size: 11px; white-space: nowrap; }
+}
+@media (max-width: 760px) { .daybox { flex-direction: row; align-items: center; gap: 6px; } #updated { display: none; } .foot .updLine { display: block; } }
+[data-theme="light"] .tab.active, [data-theme="light"] .tab.active .tl, [data-theme="light"] .tab.active .ti { color: #0b3a75 !important; font-weight: 700; opacity: 1; }
+[data-theme="light"] .tab { color: #46453c; }
