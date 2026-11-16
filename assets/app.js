@@ -51,7 +51,14 @@ const GUIDE = '<details class="card guide"><summary>❓ איך קוראים את
   '<li><b>המלצה בודדת</b> = הימור אחד על משחק אחד, לא קשור לטפסים.</li>' +
   '<li><b>הסימנים:</b> ✅ נתפס · ❌ נפל · ⏳ עדיין לא נגמר · ↩ הוחזר.</li>' +
   '<li><b>"x מתוך y"</b> = כמה נתפסו מתוך אלה שכבר נגמרו.</li>' +
-  '<li><b>יחס</b> = כמה משלמים על כל שקל. יחס Bet365 הוא לעיון, תבדוק תמיד את היחס באתר שלך.</li></ul></details>';
+  '<li><b>יחס</b> = כמה משלמים על כל שקל. יחס Bet365 הוא לעיון, תבדוק תמיד את היחס באתר שלך.</li></ul>' +
+  '<h5 class="gloss">📖 מילון קצר</h5><ul class="notes">' +
+  '<li><b>מעל / מתחת</b> = יהיו יותר או פחות מהמספר (למשל מעל 2.5 שערים = שלושה שערים ומעלה).</li>' +
+  '<li><b>1X</b> = הבית לא מפסידה (ניצחון או תיקו). <b>X2</b> = החוץ לא מפסידה. <b>12</b> = לא תיקו.</li>' +
+  '<li><b>הנדיקאפ (+2)</b> = נותנים לקבוצה יתרון של שתי יחידות לפני המשחק.</li>' +
+  '<li><b>3 אפשרויות</b> = שוק של שלוש תשובות: מעל, מתחת, או בדיוק המספר.</li>' +
+  '<li><b>בעיטות למסגרת</b> = בעיטות שהיו בדרך לשער (נעצרו בידי השוער או נכנסו).</li>' +
+  '<li><b>קרנות במחצית</b> = קרנות במחצית הראשונה בלבד.</li></ul></details>';
 async function init() {
   initA11y();
   try { state.index = await getJson('data/days/index.json'); }
@@ -151,6 +158,21 @@ function dayChips() {
   }).join('') + '</div><span class="muted dayHint">ימים ישנים יותר: בתפריט שבראש העמוד</span></div>';
 }
 // סיכום של היום שנבחר, על אותו יום בלבד: טפסים והמלצות בודדות
+const DOT = r => r && r.includes('win') ? '🟢' : r && r.includes('lose') ? '🔴' : '⚪';
+function streakLine() {
+  const L = (state.index.matchLog || []).filter(e => e.res && (e.res.includes('win') || e.res.includes('lose'))).sort((a, b) => b.ts - a.ts).slice(0, 12);
+  if (L.length < 4) return '';
+  const w = L.filter(e => e.res.includes('win')).length;
+  return '<p class="dots"><span class="muted">12 ההמלצות האחרונות (מהחדשה):</span> ' + L.map(e => DOT(e.res)).join('') + ' <b>' + w + ' מתוך ' + L.length + '</b></p>';
+}
+function heroPick() {
+  const d = state.day; if (!d || d.date !== ilToday()) return '';
+  const c = (d.matchPicks || []).map(p => { const f = findFx(p.fid); return f && f.markets[p.mi] && !f.result && f.ts > nowS() ? { f, m: f.markets[p.mi], i: idxOf(p.fid) } : null; }).filter(Boolean)
+    .sort((a, b) => b.m.score - a.m.score || ((b.m.odds ? 1 : 0) - (a.m.odds ? 1 : 0)) || (b.m.ev || 0) - (a.m.ev || 0))[0];
+  if (!c || c.m.score < 6) return '';
+  const oks = (c.m.checks || []).filter(x => x.k === 'ok').slice(0, 2).map(x => esc(x.t));
+  return '<div class="card heroPick" onclick="openMatch(' + c.i + ')"><div class="hpTop">🌟 ההימור הכי חזק שעוד לא התחיל</div><div class="hpMain"><span class="score ' + scoreCls(c.m.score) + '">' + c.m.score + '</span><div><div class="plabel">' + mIcon(c.m) + ' ' + esc(c.m.label) + '</div><div class="pmeta">' + bd(c.f.home.name) + ' – ' + bd(c.f.away.name) + ' · ' + fmtTime(c.f.ts) + '</div></div>' + oddsTag(c.m) + '</div>' + (oks.length ? '<ul class="hpWhy">' + oks.map(t => '<li>✓ ' + t + '</li>').join('') + '</ul>' : '') + '</div>';
+}
 function nextKickoff(date) {
   if (!state.day || state.day.date !== date) return '';
   const up = state.day.fixtures.filter(f => !f.result && f.ts > nowS()).sort((a, b) => a.ts - b.ts)[0];
@@ -162,9 +184,9 @@ function daySummary(date) {
   const st = slipDayStat(date), L = (state.index.matchLog || []).filter(e => e.d === date), done = L.filter(e => e.res), w = done.filter(e => e.res.includes('win')).length, l = done.filter(e => e.res.includes('lose')).length;
   if (!st && !L.length) return '';
   const cell = (t, a, b) => '<div class="kpi"><b>' + a + '</b><span>' + t + (b ? '<br><small>' + b + '</small>' : '') + '</span></div>';
-  return '<div class="card daySum"><h4>📌 סיכום ' + dayName(date) + ' <span class="muted">· ' + fmtShort(date) + ', רק משחקים של היום הזה</span></h4><div class="kpis">' +
+  return heroPick() + '<div class="card daySum"><h4>📌 סיכום ' + dayName(date) + ' <span class="muted">· ' + fmtShort(date) + ', רק משחקים של היום הזה</span></h4><div class="kpis">' +
     (st ? cell('טפסים', st.w + ' מתוך ' + st.n, st.w + st.l < st.n ? (st.n - st.w - st.l) + ' עוד ממתינים' : 'כולם נגמרו') : '') +
-    (L.length ? cell('המלצות בודדות (משחק אחד = המלצה אחת)', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div>' + nextKickoff(date) + '</div>';
+    (L.length ? cell('המלצות בודדות (משחק אחד = המלצה אחת)', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div>' + streakLine() + nextKickoff(date) + '</div>';
 }
 // סיכום "מה קרה ביום האחרון שנגמר": כל טופס ואיך הוא יצא
 function recapHtml(date) {

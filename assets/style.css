@@ -560,3 +560,10 @@ h2 { font-size: 21px; } h3.secTitle { font-size: 17px; margin: 18px 0 8px; }
 
 .luTag { margin-top: 3px; font-size: 12.5px; color: var(--muted); } .luTag.ok { color: #7ee2a8; } .luTag.wait { color: #f0c66a; }
 [data-theme="light"] .luTag.ok { color: #0f6b38; } [data-theme="light"] .luTag.wait { color: #8a5d00; }
+
+.heroPick { cursor: pointer; border-color: #c79a2a; background: linear-gradient(180deg, rgba(212,154,26,.12), var(--surface-1)); margin-bottom: 12px; }
+.hpTop { font-weight: 700; margin-bottom: 8px; } .hpMain { display: flex; align-items: center; gap: 12px; }
+.hpMain > div { flex: 1; min-width: 0; } .hpWhy { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--text-2); line-height: 1.7; }
+.dots { margin: 10px 2px 0; font-size: 15px; letter-spacing: 1px; } .dots .muted { letter-spacing: 0; }
+.gloss { margin: 14px 0 4px; font-size: 14px; }
+[data-theme="light"] .heroPick { background: linear-gradient(180deg, #fff6df, #fff); border-color: #d9a93a; }
