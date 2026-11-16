@@ -19,7 +19,7 @@ const isResult = m => m.stat === 'g' && (m.group === '1x2' || m.group === 'dc');
 const mType = m => isResult(m) ? 'res' : m.stat;
 const mIcon = m => isResult(m) ? '🏁' : (STAT[m.stat] || {}).icon || '';
 const TYPE_NAME = { res: '🏁 תוצאה', g: '⚽ שערים', c: '🚩 קרנות', c1: '⏱🚩 קרנות במחצית', sh: '🎯 בעיטות', sot: '🥅 בעיטות למסגרת' };
-const SITE_URL = 'https://claude.ai/artifact/8bSCtDGHwGoaevEmygFyUz';
+const SITE_URL = 'https://stavzohar7.github.io/corner-iq/';
 
 const state = { index: null, day: null, tab: 'today', q: '', sf: 'all', tday: 'all' };
 
@@ -51,7 +51,7 @@ async function init() {
   if (first) { sel.value = first; await loadDay(first); }
 }
 async function loadDay(date) {
-  state.day = await getJson('data/days/' + date + '.json');
+  state.day = await getJson('data/days/' + date + '.json'); if (typeof bb !== 'undefined' && bb.idx && bb.idx.days.some(x => x.date === date && x.games) && bb.date !== date) { bb.date = null; }
   const d = state.day;
   $('#updated').textContent = 'עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt });
   $('#banners').innerHTML = (d.notes || []).map(n => '<div class="banner">' + esc(n) + '</div>').join('');
@@ -484,7 +484,7 @@ const bbComp = c => c === 103 ? 'NBA' : 'יורוליג';
 async function bbLoad(date) {
   if (!bb.idx) { try { bb.idx = await getJson('data/bball/index.json'); } catch (e) { bb.idx = { days: [], picksLog: [] }; } }
   const days = bb.idx.days.filter(d => d.games);
-  if (!date) date = bb.date || (state.defDate && days.find(d => d.date === state.defDate) ? state.defDate : (days[0] && days[0].date));
+  if (!date) date = (state.day && days.find(d => d.date === state.day.date) ? state.day.date : null) || bb.date || (state.defDate && days.find(d => d.date === state.defDate) ? state.defDate : (days[0] && days[0].date));
   if (date && bb.date !== date) { bb.date = date; try { bb.day = await getJson('data/bball/' + date + '.json'); } catch (e) { bb.day = null; } }
   return bb.day;
 }
@@ -774,7 +774,7 @@ function weekHtml(ws, compact) {
   }
   return html + '</div>';
 }
-const trTab = () => state.trSub || 'week', hid = k => trTab() === k ? '' : ' hidden';
+const trTab = () => state.trSub || 'slips', hid = k => trTab() === k ? '' : ' hidden';
 const trNav = () => subNav([['week', '📅 סיכום שבועי'], ['slips', '💰 הטפסים שלי'], ['recs', '⚽ המלצות לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
 function weekPanel() {
   const wl = weekList(); if (!wl.length) return '<div class="empty">עוד אין נתונים לסיכום.</div>';
@@ -864,3 +864,11 @@ async function fillModelAcc() {
       '<p>בסך המשחק ההבדל קטן, כי כדורגל רועש. ההתאמה לכל קבוצה משפרת בעיקר את החיזוי של בעיטות, ומעט את הקרנות והשערים, ולכן ההמלצות הן יתרון קטן ולא ודאות. הפרמטרים נבחרו בבדיקה על ' + Math.round(Object.values(m.seasons).reduce((t, x) => t + x.g.n, 0)) + ' משחקים, כולל שימוש בעונה הקודמת כידע מקדים.</p>';
   } catch (e) { el.textContent = 'אין עדיין נתוני בדיקה.'; }
 }
+// ---- פסקאות הסבר ארוכות נקפלות ל"ℹ️ הסבר": פחות רעש, והמידע עדיין שם ----
+new MutationObserver(() => {
+  document.querySelectorAll('main p.lead:not([data-f])').forEach(p => {
+    p.dataset.f = '1'; if (p.hidden || p.textContent.length < 60) return;
+    const d = document.createElement('details'); d.className = 'leadFold'; const sm = document.createElement('summary'); sm.textContent = 'ℹ️ הסבר על המסך הזה'; d.appendChild(sm);
+    p.parentNode.insertBefore(d, p); d.appendChild(p);
+  });
+}).observe(document.querySelector('main'), { childList: true, subtree: true });

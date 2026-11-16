@@ -482,3 +482,16 @@ details.legend { margin: 6px 0 14px; font-size: 13px; color: var(--muted); } det
 .recapRow.fin-lose { border-color: #6b2a2a; background: rgba(200,60,60,.06); }
 .recapRow .rhead { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .recapRow .rlegs { line-height: 1.7; }
+
+.leadFold { margin: 2px 0 12px; } .leadFold summary { cursor: pointer; color: var(--muted); font-size: 13px; } .leadFold .lead { margin: 6px 0 0; }
+
+/* ---- מחשב: אתר רחב ומסודר, מקסימום שלוש עמודות ---- */
+@media (min-width: 900px) {
+  main, .topin, .tabs, #banners, .foot { max-width: 1100px; margin-inline: auto; }
+  .tabs { gap: 6px; } .tab { flex: 1; justify-content: center; }
+  .slipGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
+  .srows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kgrid, .tmGrid { grid-template-columns: repeat(3, 1fr) !important; }
+  .dayStrip .chips { flex-wrap: wrap; }
+}
+@media (min-width: 1300px) { main, .topin, .tabs, #banners, .foot { max-width: 1240px; } }
