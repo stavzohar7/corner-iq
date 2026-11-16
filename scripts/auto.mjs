@@ -11,9 +11,13 @@ fs.mkdirSync(path.dirname(LOG), { recursive: true });
 const note = m => { const l = `[${new Date().toISOString()}] ${m}\n`; process.stdout.write(l); fs.appendFileSync(LOG, l); };
 const ilDate = ms => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date(ms));
 
-try { if (fs.existsSync(LOCK) && Date.now() - fs.statSync(LOCK).mtimeMs < 20 * 60e3) { note('הרצה קודמת עדיין פעילה, מדלג'); process.exit(0); } } catch { /* */ }
+// נעילה נחשבת פעילה רק אם התהליך שיצר אותה עדיין חי (נעילה יתומה אחרי קריסה לא חוסמת)
+const alive = pid => { try { process.kill(pid, 0); return true; } catch { return false; } };
+try { if (fs.existsSync(LOCK) && Date.now() - fs.statSync(LOCK).mtimeMs < 20 * 60e3 && alive(Number(fs.readFileSync(LOCK, 'utf8')))) { note('הרצה קודמת עדיין פעילה, מדלג'); process.exit(0); } } catch { /* */ }
 fs.writeFileSync(LOCK, String(process.pid));
 process.on('exit', () => { try { fs.unlinkSync(LOCK); } catch { /* */ } });
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.on(sig, () => { note('הופסקה על ידי ' + sig); process.exit(1); });
+note('התחלה');
 
 const today = ilDate(Date.now()), tomorrow = ilDate(Date.now() + 86400e3);
 let failed = 0;
