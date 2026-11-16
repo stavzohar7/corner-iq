@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
 export const topicFile = root => path.join(root, 'data', 'cache', 'notify-topic.txt');
 export function getTopic(root) {
+  if (process.env.NTFY_TOPIC) return process.env.NTFY_TOPIC.trim();   // בענן: מתוך סוד של GitHub
   const f = topicFile(root);
   if (fs.existsSync(f)) return fs.readFileSync(f, 'utf8').trim();
   const t = 'corneriq-' + crypto.randomBytes(8).toString('hex');   // ערוץ לא ניתן לניחוש: מי שמכיר אותו יכול לקרוא את ההתראות
@@ -21,7 +22,10 @@ async function send(topic, title, message, tags) {
 
 export async function runNotify({ root, today, log = () => {} }) {
   if (process.env.NO_NOTIFY) return 0;
-  const topic = getTopic(root), stFile = path.join(root, 'data', 'cache', 'notify-state.json');
+  if (process.env.GITHUB_ACTIONS && !process.env.NTFY_TOPIC) { log('התראות: אין סוד NTFY_TOPIC בענן, מדלג'); return 0; }
+  const topic = getTopic(root), stFile = path.join(root, 'data', 'notify-state.json');   // מצב משותף למחשב ולענן (נדחף לריפו), כדי שלא יישלחו כפילויות
+  const old = path.join(root, 'data', 'cache', 'notify-state.json');
+  if (!fs.existsSync(stFile) && fs.existsSync(old)) fs.copyFileSync(old, stFile);
   const first = !fs.existsSync(stFile), st = readJson(stFile, { sent: {} });
   const slips = readJson(path.join(root, 'data', 'slips.json'), { days: [] }).days;
   const day = readJson(path.join(root, 'data', 'days', `${today}.json`), null);
