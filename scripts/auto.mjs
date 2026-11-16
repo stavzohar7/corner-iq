@@ -29,5 +29,6 @@ for (const date of [tomorrow, today]) {   // היום אחרון, כדי ש-last
   if (r.status === 0) note(`${date} ${reuse ? '(רענון)' : '(מלא)'} הצליח: ${out}`);
   else { failed++; note(`${date} נכשל: ${(r.stderr || r.error || '').toString().trim().split('\n').pop()}`); }
 }
+try { const { runNotify } = await import('./notify.mjs'); await runNotify({ root: ROOT, today, log: note }); } catch (e) { note('התראות נכשלו: ' + e.message); }
 { const r = spawnSync(process.execPath, ['scripts/publish-git.mjs'], { cwd: ROOT, encoding: 'utf8', timeout: 3 * 60e3, windowsHide: true }); note('פרסום ל-GitHub: ' + ((r.stdout || '') + (r.stderr || '')).trim().split(String.fromCharCode(10)).pop()); }
 process.exit(failed === 2 ? 1 : 0);
