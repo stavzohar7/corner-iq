@@ -90,6 +90,7 @@ export async function fetchRealOdds({ root, today, dayFx, order = [], log = () =
     for (const o of ours) if (!pair.has(o.id) && !cache.fx[o.id]) cache.fx[o.id] = { api: null, at: now, bets: null };
     log(`יחסי Bet365: נמצאו ל-${got} משחקים מתוך ${ours.length} (${pair.size} הותאמו ל-API, ${cache.calls} קריאות היום)`);
   } catch (e) {
+    { if (/suspend/i.test(e.message)) try { fs.mkdirSync(path.join(root, 'data', 'cache'), { recursive: true }); fs.writeFileSync(path.join(root, 'data', 'cache', 'api-status.json'), JSON.stringify({ suspended: true, at: Date.now(), msg: e.message })); } catch { /* */ } }
     log('יחסי Bet365: נעצר (' + e.message + ')');
   }
   save();

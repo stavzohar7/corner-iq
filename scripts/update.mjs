@@ -430,6 +430,8 @@ async function main() {
   writeJson(path.join(DATA, 'cache', 'last-run.json'), { at: dayDoc.updated, newlyGraded: newly });
   writeJson(CACHE_FILE, cache);
   if (!process.env.SKIP_EXTRAS) try { await runBasketball({ root: ROOT, today, log, reuse: REUSE }); } catch (e) { log('כדורסל נכשל: ' + e.message); }
+  try { const sf = path.join(DATA, 'cache', 'api-status.json'), stt = readJson(sf, null), df = path.join(DAYS, `${today}.json`), dd = readJson(df, null);
+    if (stt && stt.suspended && Date.now() - stt.at < 36 * 3600e3 && dd) { const msg = '⚠️ מקור יחסי Bet365 (API-Football) מושעה כרגע. אין יחסים חדשים: בכדורסל (NBA ויורוליג) אין המלצות וטפסים, ובכדורגל ההמלצות החדשות מסתמכות על יחסים מוערכים.'; dd.notes = [...(dd.notes || []).filter(n => !String(n).includes('מושעה')), msg]; writeJson(df, dd); log('מקור היחסים מושעה'); } } catch (e) { log('בדיקת סטטוס API נכשלה: ' + e.message); }
   if (!process.env.SKIP_EXTRAS) try { runSlip({ root: ROOT, today, log }); } catch (e) { log('הטופס היומי נכשל: ' + e.message); }
   try { runLearnReport({ root: ROOT, log }); } catch (e) { log('לקחים נכשל: ' + e.message); }
   log(`סיום. ${fixtures.length} משחקים, תוצאות חדשות שנבדקו: ${newly}. קריאות ל-365Scores: ${stats365.calls}. ${notes.join(' ')}`);

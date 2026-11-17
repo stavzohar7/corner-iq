@@ -181,7 +181,7 @@ export async function fetchBBOdds({ root, today, games, log = () => {} }) {
       if (cache.fx[o.id].bets) got++;
     }
     log(`כדורסל: יחסי Bet365 ל-${got} משחקים מתוך ${ours.length} (${cache.calls} קריאות היום)`);
-  } catch (e) { log('כדורסל: יחסים נעצרו (' + e.message + ')'); }
+  } catch (e) { { if (/suspend/i.test(e.message)) try { fs.mkdirSync(path.join(root, 'data', 'cache'), { recursive: true }); fs.writeFileSync(path.join(root, 'data', 'cache', 'api-status.json'), JSON.stringify({ suspended: true, at: Date.now(), msg: e.message })); } catch { /* */ } } log('כדורסל: יחסים נעצרו (' + e.message + ')'); }
   fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(cache));
   return result();
 }
