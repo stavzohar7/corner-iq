@@ -25,6 +25,7 @@ const full = l => {
   const o = { sport: l.sport, id: fx.id, mi: -1, key: l.key, kind: l.sport === 'f' ? [a, b, c].join('|') : a + '|' + b, label: l.label, game: clean(fx.home.name) + ' – ' + clean(fx.away.name), ts: fx.ts, odds: l.odds, score: l.score || 6, p: l.p || 0, ev: l.ev || 0, src: 'fivebet' };
   if (l.sport === 'f') { o.lg = fx.lg; o.stat = a; } else { o.grp = a; o.sd = b; o.prop = a === 'pst'; }
   if (l.why) o.why = l.why;
+  if (l.fb) o.fb = l.fb;   // נתיב המשחק באתר fivebet: משמש את כפתור "בנה קופון"
   return o;
 };
 const tot = L => Math.round(L.reduce((x, l) => x * l.odds, 1) * 100) / 100;

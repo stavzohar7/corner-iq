@@ -42,7 +42,7 @@ window.__fbList = () => { const t = document.body.innerText, out = [], re = /\n(
 // קוראת את המשחק הפתוח
 window.__fbGame = async () => {
   const head = window.__fbHead(), slug = (location.href.match(/game=([^&]+)/) || [])[1] || '', gid = (location.href.match(/gameId=(\d+)/) || [])[1] || slug;
-  const g = { gid, slug, head, main: window.__fbMain() };
+  const g = { gid, slug, url: location.pathname + location.search, head, main: window.__fbMain() };
   if (await window.__tab('Corners')) g.c = window.__fbLadders('Corners:');
   if (await window.__tab('Shots on target')) g.sot = window.__fbLadders('Shots on target:');
   if (await window.__tab('Shots')) g.sh = window.__fbLadders('Shots:');
@@ -72,4 +72,4 @@ window.__fbStatus = () => JSON.parse(localStorage.__FBS || '{}');
 // ייצוא קצר: בכל סולם משאירים את השורות סביב הקו המאוזן (פחות טקסט להעברה)
 const trim = (arr, w) => { if (!arr || !arr.length) return arr; let best = arr[0]; for (const r of arr) if (Math.abs(r[1] - r[2]) < Math.abs(best[1] - best[2])) best = r; return arr.filter(r => Math.abs(r[0] - best[0]) <= w); };
 const trimL = (L, w) => { if (!L) return L; const o = {}; for (const k of ['tot', 't1', 't2', 'hc']) if (L[k]) o[k] = trim(L[k], w); return o; };
-window.__fbExport = () => { const F = JSON.parse(localStorage.__FB || '{}'); return JSON.stringify(Object.values(F).map(g => ({ gid: g.gid, h: g.h, a: g.a, date: g.date, time: g.time, main: Object.assign({}, g.main, trimL(g.main, 2.6)), c: trimL(g.c, 3.6), sot: trimL(g.sot, 2.6), sh: trimL(g.sh, 6) }))); };
+window.__fbExport = () => { const F = JSON.parse(localStorage.__FB || '{}'); return JSON.stringify(Object.values(F).map(g => ({ gid: g.gid, url: g.url, h: g.h, a: g.a, date: g.date, time: g.time, main: Object.assign({}, g.main, trimL(g.main, 2.6)), c: trimL(g.c, 3.6), sot: trimL(g.sot, 2.6), sh: trimL(g.sh, 6) }))); };

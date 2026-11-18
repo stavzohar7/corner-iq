@@ -102,7 +102,7 @@ function pick3(pool, avoid = new Set(), avoidGames = new Set()) {
   }
   return [];
 }
-const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: c.why });
+const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: c.why });
 const total = L => Math.round(L.reduce((p, c) => p * c.odds, 1) * 100) / 100;
 const spec = { date, strong: {}, second: {}, win: [], fixed: [] }, seen = new Set(), sigOf = L => L.map(legSig).sort().join(',');
 const strong = pick3(cands); if (strong.length === 3) { spec.strong.f = strong.map(toLeg); seen.add(sigOf(strong)); }
