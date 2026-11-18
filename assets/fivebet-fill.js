@@ -8,12 +8,13 @@
   const norm = s => String(s || '').replace(/[‎‏\s]+/g, ' ').trim();
   const numIn = s => { const m = String(s).match(/\(([^)]+)\)/); return m ? parseFloat(m[1].replace('+', '')) : NaN; };
   const title = b => b.innerText.split('\n').map(x => x.trim()).filter(x => x && !/^[ÙÃÁ]$/.test(x))[0];
-  const blocks = t => [...document.querySelectorAll('.tg__match_item')].filter(b => b.querySelector('a.odCnt') && title(b) === t);
+  let D = document;   // המסמך שבו קוראים: לכל משחק נטען חלון נסתר של fivebet
+  const blocks = t => [...D.querySelectorAll('.tg__match_item')].filter(b => b.querySelector('a.odCnt') && title(b) === t);
   const cells = t => blocks(t).flatMap(b => [...b.querySelectorAll('a.odCnt')]).map(a => { const x = norm(a.innerText), m = x.match(/^(.*?)\s*([\d.]+)$/); return { a, name: m ? m[1] : x, odds: m ? parseFloat(m[2]) : NaN }; });
   const PREF = { g: '', c: 'Corners: ', sh: 'Shots: ', sot: 'Shots on target: ' }, TAB = { c: 'Corners', sh: 'Shots', sot: 'Shots on target' };
 
   async function openTab(n) {
-    const els = [...document.querySelectorAll('*')].filter(e => e.children.length === 0 && norm(e.innerText) === n);
+    const els = [...D.querySelectorAll('*')].filter(e => e.children.length === 0 && norm(e.innerText) === n);
     const el = els.find(e => e.getBoundingClientRect().top < 600) || els[0]; if (el) { el.click(); await sleep(2200); } return !!el;
   }
   // לפי מפתח ההימור: באיזה בלוק ובאיזו שורה
@@ -31,13 +32,17 @@
       const W = { home: 'Win1', away: 'Win2', draw: 'Draw' }[r]; return { t: 'Result and total', f: c => c.name.startsWith(W + ' and ' + O + ' (') && numIn(c.name) === ln }; }
     return null;
   }
-  const couponCount = () => { const t = document.body.innerText, i = t.indexOf('BET SLIP'); const m = t.slice(i, i + 40).match(/BET SLIP\s*\n\s*(\d+)/); return m ? +m[1] : 0; };
-  async function clearCoupon() { for (let k = 0; k < 30; k++) { const b = document.querySelector('.dg_bs_stake_remove_btn'); if (!b) break; b.click(); await sleep(350); } }
-  const snap = () => { const b = document.querySelector('.tg__match_item'); return b ? b.innerText.slice(0, 200) : ''; };
+  const couponCount = () => { const t = D.body.innerText, i = t.indexOf('BET SLIP'); const m = t.slice(i, i + 40).match(/BET SLIP\s*\n\s*(\d+)/); return m ? +m[1] : 0; };
+  async function clearCoupon() { for (let k = 0; k < 30; k++) { const b = D.querySelector('.dg_bs_stake_remove_btn'); if (!b) break; b.click(); await sleep(350); } }
+  let frame = null;
   async function goGame(leg) {
-    const gid = (leg.fb.match(/gameId=(\d+)/) || [])[1], same = location.href.includes('gameId=' + gid), before = snap();
-    if (!same) { history.pushState({}, '', leg.fb.replace(/^https?:\/\/[^/]+/, '')); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); }
-    for (let w = 0; w < 30; w++) { await sleep(1000); if (location.href.includes('gameId=' + gid) && document.querySelectorAll('.tg__match_item').length > 50 && (same || w >= 3 && snap() !== before || w >= 12)) { await sleep(800); return true; } }
+    const gid = (leg.fb.match(/gameId=(\d+)/) || [])[1];
+    if (frame && frame.dataset.gid === gid) return true;
+    if (frame) frame.remove();
+    frame = document.createElement('iframe'); frame.dataset.gid = gid; frame.dataset.ciq = '1';
+    frame.style.cssText = 'position:fixed;left:0;top:0;width:1000px;height:800px;opacity:0.01;pointer-events:none;border:0';
+    frame.src = leg.fb.replace(/^https?:\/\/[^/]+/, ''); document.body.appendChild(frame);
+    for (let w = 0; w < 40; w++) { await sleep(1000); try { D = frame.contentDocument; if (D && D.querySelectorAll('.tg__match_item').length > 50) { await sleep(1200); return true; } } catch (e) {} }
     return false;
   }
   async function addLeg(leg) {
@@ -64,12 +69,14 @@
       ui.slips.map((s, i) => '<div style="margin:8px 0;padding:8px;border:1px solid #334;border-radius:8px"><b>' + html(s.name) + '</b> · יחס ' + s.total + '<br>' + s.legs.map(l => '• ' + html(l.label) + ' <small style="opacity:.7">(' + html(l.game) + ', ' + l.odds + ')</small>').join('<br>') +
         '<br><button data-i="' + i + '" ' + (busy ? 'disabled' : '') + ' style="margin-top:6px;padding:8px 12px;border-radius:8px;border:0;background:#f5c542;color:#111;font-weight:700">בנה קופון</button></div>').join('') +
       (ui.log.length ? '<div style="margin-top:8px;font-size:13px">' + ui.log.map(x => html(x)).join('<br>') + '</div>' : '') +
+      (ui.done ? '<button id="ciqshow" style="margin-top:8px;padding:10px 14px;border-radius:8px;border:0;background:#3ddc84;color:#111;font-weight:700">הצג את הקופון בעמוד</button>' : '') +
       '<p style="opacity:.7;font-size:12px">הכלי רק מוסיף הימורים לקופון. את הסכום ולחיצה על PLACE BET אתה עושה בעצמך, אחרי שבדקת.</p>';
-    box.querySelector('#ciqx').onclick = () => box.remove();
+    box.querySelector('#ciqx').onclick = () => { if (frame) frame.remove(); box.remove(); };
+    const sh = box.querySelector('#ciqshow'); if (sh) sh.onclick = () => location.reload();
     box.querySelectorAll('button[data-i]').forEach(b => b.onclick = () => build(ui.slips[+b.dataset.i]));
   }
   async function build(s) {
-    ui.log = ['מנקה את הקופון...']; render(true); await clearCoupon();
+    ui.done = false; ui.log = ['מנקה את הקופון...']; render(true); D = document; await clearCoupon();
     let ok = 0;
     for (const l of s.legs) {
       ui.log.push('מוסיף: ' + l.label + '...'); render(true);
@@ -77,9 +84,9 @@
       ui.log[ui.log.length - 1] = (r.ok ? '✓ ' : '✗ ') + l.label + (r.ok ? (Math.abs(r.odds - r.was) > 0.005 ? ' (היחס עכשיו ' + r.odds + ', היה ' + r.was + ')' : ' (' + r.odds + ')') : ': ' + r.why);
       if (r.ok) ok++;
     }
-    const bad = /cannot be combined/i.test(document.body.innerText); if (bad) ui.log.push('שים לב: fivebet מסמן שחלק מההימורים לא ניתנים לשילוב בקופון אחד. הסר את אחד מהם.');
+    const bad = /cannot be combined/i.test(D.body.innerText); if (bad) ui.log.push('שים לב: fivebet מסמן שחלק מההימורים לא ניתנים לשילוב בקופון אחד. הסר את אחד מהם.');
     ui.log.push(ok === s.legs.length ? 'הקופון מוכן (' + ok + ' הימורים). בדוק אותו בצד הקופון, הכנס סכום ולחץ בעצמך.' : 'נוספו ' + ok + ' מתוך ' + s.legs.length + '. בדוק את הקופון לפני שאתה ממשיך.');
-    render(false);
+    ui.done = true; render(false);
   }
   async function load() {
     ui.msg = 'טוען את הטפסים מהאתר...'; render(false);
