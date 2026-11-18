@@ -113,7 +113,7 @@ async function loadDay(date) {
   const d = state.day;
   $('#updated').textContent = 'עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt });
   { const ageH = (Date.now() - new Date(d.updated).getTime()) / 3600e3, isToday = date >= ilToday(), stale = isToday && ageH > 3 ? '<div class="banner warnB">⚠️ הנתונים עודכנו לפני ' + (ageH < 24 ? Math.round(ageH) + ' שעות' : Math.round(ageH / 24) + ' ימים') + '. ייתכן שחלק מהתוצאות וההרכבים לא מעודכנים. העדכון האוטומטי רץ כל שעה, ואם הוא נתקע זה יתוקן בהרצה הבאה.</div>' : '';
-    $('#banners').innerHTML = stale + (d.notes || []).map(n => '<div class="banner">' + esc(n) + '</div>').join(''); }
+    $('#banners').innerHTML = stale + (d.notes || []).map(n => String(n).length > 90 ? '<details class="banner"><summary>' + (String(n).includes('מושעה') ? '⚠️ יחסי Bet365 לא מתעדכנים כרגע' : esc(String(n).slice(0, 48)) + '…') + ' <b>לפרטים</b></summary><p>' + esc(n) + '</p></details>' : '<div class="banner">' + esc(n) + '</div>').join(''); }
   const mt = d.meta || {};
   $('#srcLine').textContent = mt.fd ? 'מקורות: football-data.co.uk (' + mt.fd + ' משחקי עונה) · 365Scores (' + mt.s365 + ' משחקים, מהם ' + mt.h1 + ' עם נתוני מחצית) · התאמה בין המקורות בקרנות: ' + mt.same + ' מתוך ' + mt.checked : '';
   { const sl = $('#srcLine'); sl.textContent = '🕒 עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt }) + (sl.textContent ? ' · ' + sl.textContent : ''); }
@@ -215,9 +215,9 @@ function daySummary(date) {
   const st = slipDayStat(date), L = (state.index.matchLog || []).filter(e => e.d === date), done = L.filter(e => e.res), w = done.filter(e => e.res.includes('win')).length, l = done.filter(e => e.res.includes('lose')).length;
   if (!st && !L.length) return '';
   const cell = (t, a, b) => '<div class="kpi"><b>' + a + '</b><span>' + t + (b ? '<br><small>' + b + '</small>' : '') + '</span></div>';
-  return heroPick() + '<div class="card daySum"><h4>📌 סיכום ' + dayName(date) + ' <span class="muted">· ' + fmtShort(date) + ', רק משחקים של היום הזה</span></h4><div class="kpis">' +
+  return heroPick() + '<div class="card daySum"><h4>📌 סיכום ' + dayName(date) + ' <span class="muted">' + fmtShort(date) + '</span></h4><div class="kpis">' +
     (st ? cell('טפסים', st.w + ' מתוך ' + st.n, st.w + st.l < st.n ? (st.n - st.w - st.l) + ' עוד ממתינים' : 'כולם נגמרו') : '') +
-    (L.length ? cell('המלצות בודדות (משחק אחד = המלצה אחת)', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div>' + streakLine() + nextKickoff(date) + '</div>';
+    (L.length ? cell('המלצות בודדות', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div>' + streakLine() + nextKickoff(date) + '</div>';
 }
 // סיכום "מה קרה ביום האחרון שנגמר": כל טופס ואיך הוא יצא
 function recapHtml(date) {
@@ -411,7 +411,7 @@ function singleRow(f, m, i) {
 function renderToday() {
   const el = $('#view-today'), d = state.day;
   const isLatest = state.day.date === state.index.days[0].date, sunday = isLatest && new Date(ilToday() + 'T00:00:00Z').getUTCDay() === 0;
-  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + GUIDE + dayChips() + daySummary(state.day.date) + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + '<div id="todayBody"><div class="empty">טוען...</div></div>';
+  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + dayChips() + daySummary(state.day.date) + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + '<div id="todayBody"><div class="empty">טוען...</div></div>' + GUIDE;
   bindDayChips(); fillToday(d.date);
 }
 function keyMatchesHtml(d) {
