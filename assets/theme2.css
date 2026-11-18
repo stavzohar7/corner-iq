@@ -165,3 +165,9 @@ details.banner summary { cursor: pointer; font-weight: 600; list-style: none; } 
 @media (max-width: 760px) { .banner { padding: 10px 14px; font-size: 13.5px; } }
 [data-theme="light"] .tab.active { background: var(--accent); }
 .jumpBar { margin: 4px 0 6px; align-items: center; } .secSub { margin: 22px 0 10px; font-size: 17px; scroll-margin-top: 120px; }
+
+/* טלפון: טקסט קטן יותר ופרופורציונלי (בנוסף להקטנה הכללית ב-app.js) */
+@media (max-width: 760px) {
+  .tab { font-size: 12.5px; } .tab .ti { font-size: 23px; }
+  h2 { font-size: 24px; } h1 { font-size: 22px; }
+}

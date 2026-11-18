@@ -48,8 +48,11 @@ const bySport = c => c.game.comp === 103 ? 'n' : 'e';
 const spec = { date, strong: {}, second: {} };
 for (const sp of ['n', 'e']) {
   const S = strong.filter(c => bySport(c) === sp); const T = pool.filter(c => bySport(c) === sp);
-  const pick3 = excl => { const out = [], used = new Set(); for (const c of T) { if (excl.has(c.key + c.game.id) || used.has(c.game.id)) continue; used.add(c.game.id); out.push(c); if (out.length === 3) break; } return out; };
-  const a = pick3(new Set()); if (a.length === 3) { spec.strong[sp] = a.map(c => leg(c, sp)); const b = pick3(new Set(a.map(c => c.key + c.game.id))); if (b.length === 3 && !(sp === 'e')) spec.second[sp] = b.map(c => leg(c, sp)); }
+  const pick3 = excl => { const out = [], used = new Set(); for (const c of T) { if (excl.has(c.key + c.game.id) || used.has(c.game.id)) continue; used.add(c.game.id); out.push(c); if (out.length === 3) break; }
+    // מעט משחקים ביום (יורוליג): משלימים עד 3 הימורים ממשחק שכבר נבחר, בסוג אחר (סך / נקודות קבוצה / הנדיקאפ)
+    if (sp === 'e' && out.length < 3) for (const c of T) { if (out.length === 3) break; if (excl.has(c.key + c.game.id) || out.some(x => x.game.id === c.game.id && x.key.split('|')[0] === c.key.split('|')[0])) continue; if (!out.some(x => x.game.id === c.game.id)) continue; out.push(c); }
+    return out; };
+  const a = pick3(new Set()); if (a.length === 3 || (sp === 'e' && a.length >= 1)) { spec.strong[sp] = a.map(c => leg(c, sp)); const b = pick3(new Set(a.map(c => c.key + c.game.id))); if (b.length === 3 && sp !== 'e') spec.second[sp] = b.map(c => leg(c, sp)); }
 }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `bb-spec-${date}.json`), JSON.stringify(spec, null, 1));
 console.log(`מועמדים: ${cands.length}, עוברים: ${pool.length}`);

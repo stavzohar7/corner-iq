@@ -29,7 +29,7 @@ const full = l => {
   return o;
 };
 const tot = L => Math.round(L.reduce((x, l) => x * l.odds, 1) * 100) / 100;
-const mk = (legs, extra = {}) => { if (legs.length !== 3) throw new Error('טופס חייב בדיוק 3 רגליים'); const L = legs.map(full); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
+const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 3) throw new Error('טופס חייב 1 עד 3 הימורים'); const L = legs.map(full); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
 for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) day.k[lv][sp] = mk(legs);
 if (spec.win) day.k.win = spec.win.map((w, i) => ({ id: 'w' + (i + 1), ...mk(w.legs), label: w.label }));
 if (spec.fixed) day.k.lg = spec.fixed.map((w, i) => ({ id: 'F' + (i + 1), ...mk(w.legs), label: w.label, ...(w.kind ? { kind: w.kind } : {}) }));   // טפסים קבועים וטופס לכל ליגה
