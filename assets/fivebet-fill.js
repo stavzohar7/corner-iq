@@ -33,10 +33,11 @@
   }
   const couponCount = () => { const t = document.body.innerText, i = t.indexOf('BET SLIP'); const m = t.slice(i, i + 40).match(/BET SLIP\s*\n\s*(\d+)/); return m ? +m[1] : 0; };
   async function clearCoupon() { for (let k = 0; k < 30; k++) { const b = document.querySelector('.dg_bs_stake_remove_btn'); if (!b) break; b.click(); await sleep(350); } }
+  const snap = () => { const b = document.querySelector('.tg__match_item'); return b ? b.innerText.slice(0, 200) : ''; };
   async function goGame(leg) {
-    const gid = (leg.fb.match(/gameId=(\d+)/) || [])[1];
-    if (!location.href.includes('gameId=' + gid)) { history.pushState({}, '', leg.fb.replace(/^https?:\/\/[^/]+/, '')); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); }
-    for (let w = 0; w < 30; w++) { await sleep(1000); if (location.href.includes('gameId=' + gid) && document.querySelectorAll('.tg__match_item').length > 50) { await sleep(800); return true; } }
+    const gid = (leg.fb.match(/gameId=(\d+)/) || [])[1], same = location.href.includes('gameId=' + gid), before = snap();
+    if (!same) { history.pushState({}, '', leg.fb.replace(/^https?:\/\/[^/]+/, '')); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); }
+    for (let w = 0; w < 30; w++) { await sleep(1000); if (location.href.includes('gameId=' + gid) && document.querySelectorAll('.tg__match_item').length > 50 && (same || w >= 3 && snap() !== before || w >= 12)) { await sleep(800); return true; } }
     return false;
   }
   async function addLeg(leg) {
@@ -76,6 +77,7 @@
       ui.log[ui.log.length - 1] = (r.ok ? '✓ ' : '✗ ') + l.label + (r.ok ? (Math.abs(r.odds - r.was) > 0.005 ? ' (היחס עכשיו ' + r.odds + ', היה ' + r.was + ')' : ' (' + r.odds + ')') : ': ' + r.why);
       if (r.ok) ok++;
     }
+    const bad = /cannot be combined/i.test(document.body.innerText); if (bad) ui.log.push('שים לב: fivebet מסמן שחלק מההימורים לא ניתנים לשילוב בקופון אחד. הסר את אחד מהם.');
     ui.log.push(ok === s.legs.length ? 'הקופון מוכן (' + ok + ' הימורים). בדוק אותו בצד הקופון, הכנס סכום ולחץ בעצמך.' : 'נוספו ' + ok + ' מתוך ' + s.legs.length + '. בדוק את הקופון לפני שאתה ממשיך.');
     render(false);
   }
