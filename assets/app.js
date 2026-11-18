@@ -333,7 +333,7 @@ function slipsHtml(s, sp) {
   if ([...wins, ...fixed, ...leagueSl].some(w => w.legs.some(l => l.src !== 'fivebet'))) bet365 = true;
   const jumps = [fixed.length && ['sl-fixed', '📌 קבועים'], wins.length && ['sl-win', '⏱ לפי שעות'], leagueSl.length && ['sl-lg', '🏟 לפי ליגה']].filter(Boolean);
   if (jumps.length > 1) html = '<div class="chips jumpBar"><span class="muted">קפיצה מהירה:</span>' + jumps.map(([id, t]) => '<button class="chip" type="button" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + t + '</button>').join('') + '</div>' + html;
-  return html + '<p class="muted note1">' + (bet365 ? 'טופס שמסומן Bet365 מחושב לפי יחסי Bet365: אפשר להקליד ליד כל רגל את היחס שרשום באתר שלך, והיחס הכולל יתעדכן. ' : '') + (s.final ? 'הטפסים נעולים ולא ישתנו היום.' : 'הטפסים עדיין לא נעולים.') + '</p>';
+  return html + '<p class="muted note1">' + (bet365 ? 'טופס שמסומן Bet365 מחושב לפי יחסי Bet365: אפשר להקליד ליד כל הימור את היחס שרשום באתר שלך, והיחס הכולל יתעדכן. ' : '') + (s.final ? 'הטפסים נעולים ולא ישתנו היום.' : 'הטפסים עדיין לא נעולים.') + '</p>';
 }
 async function getBBDay(date) {
   state.bbDays = state.bbDays || {};
