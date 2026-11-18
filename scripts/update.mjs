@@ -86,6 +86,22 @@ async function main() {
         if (COMP[b.comp] !== it.league.id) continue;
         if (resolveFD(b.hn) === it.teams.home.id && resolveFD(b.an) === it.teams.away.id) { ids365[it.fixture.id] = b.id; break; }
       }
+      // גיבוי: football-data מעדכן את fixtures.csv באיחור (לפעמים אחרי סוף שבוע שלם). משחקי הליגות המקומיות שלנו שחסרים שם נלקחים מ-365Scores,
+      // והקבוצות מותאמות לזהות של football-data כדי שנשתמש באותה היסטוריה ופרופיל. אין להם יחס Bet365 (יחס משוער) עד ש-football-data מתעדכן.
+      {
+        const matched = new Set(Object.values(ids365).map(String)); let extra = 0;
+        const fdLeagues = new Set(Object.values(FD_DIVS));
+        for (const b of gToday) {
+          const lg = COMP[b.comp]; if (!lg || !fdLeagues.has(lg) || ISRAEL_COMPS.includes(b.comp) || matched.has(String(b.id)) || isFinished(b)) continue;
+          if (!LEAGUES.some(l => l.id === lg)) continue;
+          const hid = resolveFD(b.hn), aid = resolveFD(b.an);
+          if (!hid || !aid || divLeague(hid) !== lg || divLeague(aid) !== lg) continue;
+          if (dayFx.some(x => x.teams.home.id === hid && x.teams.away.id === aid)) continue;
+          dayFx.push({ fixture: { id: b.id, timestamp: b.ts, status: { short: 'NS' }, venue: {}, referee: null }, league: { id: lg, season: seasonYear, round: b.round ? 'Round ' + b.round : '' }, teams: { home: { id: hid, name: b.hn }, away: { id: aid, name: b.an } } });
+          ids365[b.id] = b.id; extra++;
+        }
+        if (extra) log(`נוספו ${extra} משחקי ליגה מ-365Scores (football-data עוד לא פרסם אותם)`);
+      }
       for (const b of gToday) if (ISRAEL_COMPS.includes(b.comp) || EURO_COMPS.includes(b.comp) || b.comp === NATIONS_FIXTURE) {
         dayFx.push({ fixture: { id: b.id, timestamp: b.ts, status: { short: b.sg === 2 ? 'NS' : isFinished(b) ? 'FT' : 'LIVE' }, venue: {}, referee: null }, league: { id: COMP[b.comp], season: seasonYear, round: b.round ? 'Round ' + b.round : '' }, teams: { home: { id: b.h, name: b.hn }, away: { id: b.a, name: b.an } } });
         ids365[b.id] = b.id; cache.teams[b.h] = { n: b.hn, l: null }; cache.teams[b.a] = { n: b.an, l: null };
