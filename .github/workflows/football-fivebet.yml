@@ -1,0 +1,80 @@
+name: טפסי כדורגל מיחסי fivebet
+
+# מופעל כשהתוסף בדפדפן של הבעלים שולח קריאת יחסים (inbox/done-DATE.txt). בונה את הטפסים בענן ומפרסם.
+on:
+  push:
+    paths:
+      - 'inbox/done-*.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: cloud-update
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: שחזור מטמון הנתונים
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/cache
+            data/knowledge
+            data/expert
+            data/news
+            data/names-he.json
+            data/model.json
+          key: ciq-cache-${{ github.run_id }}
+          restore-keys: ciq-cache-
+      - name: בחירה, כתיבה ופרסום
+        run: |
+          git config user.name "corner-iq-bot"
+          git config user.email "corner-iq-bot@users.noreply.github.com"
+          DATE=$(ls inbox/done-*.txt | sed 's/.*done-//;s/\.txt//' | sort | tail -1)
+          echo "תאריך $DATE"
+          mkdir -p data/cache/siteodds
+          cp inbox/fb-$DATE-*.json data/cache/siteodds/
+          node scripts/auto.mjs || true
+          [ -f data/days/$DATE.json ] || DATE=$DATE node scripts/update.mjs
+          node scripts/fb-select.mjs $DATE
+          node scripts/fivebet-write.mjs data/cache/fb-spec-$DATE.json
+          REUSE_INPUTS=1 node scripts/update.mjs
+          node scripts/publish-git.mjs
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: הכנת קבצי האתר
+        run: |
+          mkdir -p _site
+          cp -r index.html manifest.webmanifest assets _site/
+          mkdir -p _site/data
+          cp -r data/days data/bball data/latest.json data/stats.json data/slips.json data/teams.json data/lessons.json _site/data/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

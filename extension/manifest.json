@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "קורנר IQ: קורא fivebet",
+  "version": "1.0",
+  "description": "קורא כל יום את יחסי הכדורגל מ-fivebet בדפדפן שלך (בלי כניסה לחשבון) ושולח אותם לאתר קורנר IQ שבונה מהם את הטפסים.",
+  "permissions": ["alarms", "scripting", "storage", "tabs"],
+  "host_permissions": ["https://sport.fivebet.vip/*", "https://api.github.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "קורנר IQ" }
+}
