@@ -29,7 +29,7 @@ const winOf = ts => { const m = ilMin(ts); return WIN_EDGES.filter(e => m >= e).
 
 // בדיקות לפני שהימור נכנס לטופס: ציון 6+, יחס אמיתי בטווח, משחק שלא התחיל, נתונים מספיקים, לא יותר מדי אזהרות
 function vet(m, game, nowMs) {
-  const odds = m.odds || m.estOdds;   // אין יחס Bet365 (מקור היחסים מושעה / ימים רחוקים): משתמשים ביחס המשוער, והטופס מסומן "משוער"
+  const odds = m.odds;   // רק יחס אמיתי (הנחיית המשתמש: בלי יחס משוער)
   if (!odds || m.score < 6 || odds < 1.45 || odds > 8) return false;                 // היחס לא קובע: מה שחשוב הוא איכות הניתוח (המשתמש: גם יחס 3, 4 או 5 אם הניתוח טוב)
   if (!(game.enough || game.cup) || game.ts * 1000 < nowMs - KICK) return false;
   if (m.anomaly) return false;                         // קו חריג מול ההיסטוריה: לא נכנס לטופס
@@ -47,7 +47,7 @@ function candidates(footDay, bbDay, nowMs) {
   for (const f of (footDay && footDay.fixtures) || []) {
     f.markets.forEach((m, mi) => {
       if (!vet(m, f, nowMs)) return;
-      out.push({ sport: 'f', id: f.id, lg: f.lg, mi, key: fKey(m), kind: [m.stat, m.group, m.side].join('|'), stat: m.stat, label: clean(m.label), game: `${clean(f.home.name)} – ${clean(f.away.name)}`, ts: f.ts, odds: m.odds || m.estOdds, est: !m.odds, score: m.score, p: m.pFinal || 0, ev: m.ev || 0 });
+      out.push({ sport: 'f', id: f.id, lg: f.lg, mi, key: fKey(m), kind: [m.stat, m.group, m.side].join('|'), stat: m.stat, label: clean(m.label), game: `${clean(f.home.name)} – ${clean(f.away.name)}`, ts: f.ts, odds: m.odds, score: m.score, p: m.pFinal || 0, ev: m.ev || 0 });
     });
   }
   for (const g of (bbDay && bbDay.fixtures) || []) {
@@ -263,7 +263,8 @@ export function runSlip({ root, today, log = () => {} }) {
   // כדורגל: טפסי שעות (ביום עמוס). אחרי הנעילה לא משתנים
   if (!day.final) {
     const fc = cands.filter(c => c.sport === 'f');
-    const merge = (old, fresh) => { const st = (old || []).filter(w => w.legs.some(started)), keep = new Set(st.map(w => w.label)); return [...st, ...fresh.filter(w => !keep.has(w.label) && !w.legs.some(started))]; };
+    const merge = (old, fresh) => { const o = old || [], site = o.filter(w => w.src === 'fivebet'); if (site.length) return o;   // יש טפסים לפי יחסי fivebet: נעולים, בלי אוטומטיים לידם
+      const st = o.filter(w => w.legs.some(started)), keep = new Set(st.map(w => w.label)); return [...st, ...fresh.filter(w => !keep.has(w.label) && !w.legs.some(started))]; };
     day.k.win = merge(day.k.win, buildWindows(fc));
     const fixedNew = buildFixed(fc); day.k.lg = merge(day.k.lg, [...fixedNew, ...buildLeagueSlips(fc, fixedNew)]);
   }

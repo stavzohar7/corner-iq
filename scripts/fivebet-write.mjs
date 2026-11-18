@@ -31,6 +31,7 @@ const tot = L => Math.round(L.reduce((x, l) => x * l.odds, 1) * 100) / 100;
 const mk = (legs, extra = {}) => { if (legs.length !== 3) throw new Error('טופס חייב בדיוק 3 רגליים'); const L = legs.map(full); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
 for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) day.k[lv][sp] = mk(legs);
 if (spec.win) day.k.win = spec.win.map((w, i) => ({ id: 'w' + (i + 1), ...mk(w.legs), label: w.label }));
+if (spec.fixed) day.k.lg = spec.fixed.map((w, i) => ({ id: 'F' + (i + 1), ...mk(w.legs), label: w.label, ...(w.kind ? { kind: w.kind } : {}) }));   // טפסים קבועים וטופס לכל ליגה
 slips.updated = new Date().toISOString();
 fs.writeFileSync(path.join(ROOT, 'data', 'slips.json'), JSON.stringify(slips));
 console.log('נכתב:', Object.entries(spec.strong || {}).map(([k, v]) => 'חזק ' + k + ' ' + tot(v.map(full))).join(' · '), Object.entries(spec.second || {}).map(([k, v]) => 'שני ' + k + ' ' + tot(v.map(full))).join(' · '));
