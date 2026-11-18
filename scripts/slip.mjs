@@ -9,6 +9,7 @@
 // לפני שמתחייבים על רגל היא עוברת בדיקות (vet). הטפסים מתעדכנים בהרצות הראשונות של היום, עד שהמנתח סיים לקרוא את המשחקים.
 // ברגע שהם "סופיים" הם לא משתנים יותר: רגל שנבחרה נשארת, ולא נוצרים טפסים חדשים. רק בטופס שכבר קיים ופחות משלוש רגליים משלימים מהנשארים.
 import fs from 'node:fs';
+import { LEAGUES } from './config.mjs';
 import path from 'node:path';
 import { settle, oneHot } from './model.mjs';
 import { footAct } from './acttext.mjs';
@@ -28,11 +29,13 @@ const winOf = ts => { const m = ilMin(ts); return WIN_EDGES.filter(e => m >= e).
 
 // בדיקות לפני שהימור נכנס לטופס: ציון 6+, יחס אמיתי בטווח, משחק שלא התחיל, נתונים מספיקים, לא יותר מדי אזהרות
 function vet(m, game, nowMs) {
-  if (!m.odds || m.score < 6 || m.odds < 1.45 || m.odds > 8) return false;                 // היחס לא קובע: מה שחשוב הוא איכות הניתוח (המשתמש: גם יחס 3, 4 או 5 אם הניתוח טוב)
+  const odds = m.odds || m.estOdds;   // אין יחס Bet365 (מקור היחסים מושעה / ימים רחוקים): משתמשים ביחס המשוער, והטופס מסומן "משוער"
+  if (!odds || m.score < 6 || odds < 1.45 || odds > 8) return false;                 // היחס לא קובע: מה שחשוב הוא איכות הניתוח (המשתמש: גם יחס 3, 4 או 5 אם הניתוח טוב)
   if (!(game.enough || game.cup) || game.ts * 1000 < nowMs - KICK) return false;
   if (m.anomaly) return false;                         // קו חריג מול ההיסטוריה: לא נכנס לטופס
   if (!(m.pFinal >= 0.5)) return false;
-  const bad = (m.checks || []).filter(c => c.k === 'bad').length;
+  const early = game.ts * 1000 - nowMs > 8 * 3600e3;   // רחוק מהמשחק: הרכבים עוד לא סופיים זה טבעי ולא אזהרה
+  const bad = (m.checks || []).filter(c => c.k === 'bad' && !String(c.t).includes('משוער') && !(early && String(c.t).includes('ההרכבים'))).length;
   if (bad >= 3 && !(m.analystD > 0 && bad <= 4)) return false;      // המנתח העלה את ההימור בגלל הבנת המשחק: מותרות עד 4 אזהרות כלליות (למשל יום שני ברצף שתומך ב"מתחת")
   if (m.group === 'prop' && (m.min || 0) < 24) return false;       // הימורי שחקן בטופס רק לשחקני רוטציה מרכזיים (24+ דקות): לשחקני ספסל הדקות לא יציבות
   if (m.group === 'prop' && (m.pModel < 0.55 || (m.hist && m.hist.v != null && m.hist.v < 0.45))) return false;
@@ -44,7 +47,7 @@ function candidates(footDay, bbDay, nowMs) {
   for (const f of (footDay && footDay.fixtures) || []) {
     f.markets.forEach((m, mi) => {
       if (!vet(m, f, nowMs)) return;
-      out.push({ sport: 'f', id: f.id, lg: f.lg, mi, key: fKey(m), kind: [m.stat, m.group, m.side].join('|'), stat: m.stat, label: clean(m.label), game: `${clean(f.home.name)} – ${clean(f.away.name)}`, ts: f.ts, odds: m.odds, score: m.score, p: m.pFinal || 0, ev: m.ev || 0 });
+      out.push({ sport: 'f', id: f.id, lg: f.lg, mi, key: fKey(m), kind: [m.stat, m.group, m.side].join('|'), stat: m.stat, label: clean(m.label), game: `${clean(f.home.name)} – ${clean(f.away.name)}`, ts: f.ts, odds: m.odds || m.estOdds, est: !m.odds, score: m.score, p: m.pFinal || 0, ev: m.ev || 0 });
     });
   }
   for (const g of (bbDay && bbDay.fixtures) || []) {
@@ -122,6 +125,19 @@ const FIXED = [
   { id: 'bl16', lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' },
   { id: 'pl17', lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' },
 ];
+// טופס חזק אחד לכל ליגה: משלושה משחקים שונים לפחות, מכל שעות המשחקים של הליגה באותו יום
+function buildLeagueSlips(footCands, fixed = []) {
+  const out = [], byLg = new Map();
+  for (const c of footCands) { if (!byLg.has(Number(c.lg))) byLg.set(Number(c.lg), []); byLg.get(Number(c.lg)).push(c); }
+  for (const [lg, L] of byLg) {
+    if (new Set(L.map(c => String(c.id))).size < 3) continue;
+    const legs = pickSlips(L, [], [], 3)[0]; if (legs.length !== 3) continue;
+    const sig = legs.map(l => l.id + '|' + (l.key || l.mi)).sort().join(','); if (fixed.some(w => w.legs.map(l => l.id + '|' + (l.key || l.mi)).sort().join(',') === sig)) continue;   // אותו טופס כמו הטופס הקבוע של הליגה: לא מכפילים
+    const info = LEAGUES.find(l => l.id === lg);
+    out.push({ id: 'L' + lg, kind: 'league', label: (info ? info.he : 'ליגה ' + lg) + ' · כל משחקי היום', ...blank(), legs });
+  }
+  return out;
+}
 const ilDow = ts => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem', weekday: 'short' }).format(new Date(ts * 1000));
 function buildFixed(footCands) {
   const out = [];
@@ -246,11 +262,10 @@ export function runSlip({ root, today, log = () => {} }) {
     if (!okN && okE) K.second.n = blank(); }
   // כדורגל: טפסי שעות (ביום עמוס). אחרי הנעילה לא משתנים
   if (!day.final) {
-    const fresh = buildWindows(cands.filter(c => c.sport === 'f'));
-    const startedWins = (day.k.win || []).filter(w => w.legs.some(started));
-    day.k.win = startedWins.length ? startedWins : fresh;
-    const startedLg = (day.k.lg || []).filter(w => w.legs.some(started));
-    day.k.lg = startedLg.length ? startedLg : buildFixed(cands.filter(c => c.sport === 'f'));
+    const fc = cands.filter(c => c.sport === 'f');
+    const merge = (old, fresh) => { const st = (old || []).filter(w => w.legs.some(started)), keep = new Set(st.map(w => w.label)); return [...st, ...fresh.filter(w => !keep.has(w.label) && !w.legs.some(started))]; };
+    day.k.win = merge(day.k.win, buildWindows(fc));
+    const fixedNew = buildFixed(fc); day.k.lg = merge(day.k.lg, [...fixedNew, ...buildLeagueSlips(fc, fixedNew)]);
   }
   // סופי = הרצה חוזרת אחרי שהמנתח כתב את הערותיו (או אחרי 14:00 שעון ישראל), וכשיש לפחות הימור אחד בטופס חזק כלשהו. אחרי זה הטפסים לא משתנים
   const notes = fs.existsSync(path.join(root, 'data', 'expert', `${today}.json`)) || fs.existsSync(path.join(root, 'data', 'expert', `bball-${today}.json`));
