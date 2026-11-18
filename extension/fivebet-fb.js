@@ -59,6 +59,9 @@ window.__fbRun = async dd => {   // dd = 'DD.MM' (רק משחקי התאריך �
         let rows = window.__rowSel(); for (let w = 0; w < 20 && !rows.length; w++) { await sleep(1000); rows = window.__rowSel(); }
         if (!rows[k]) { st.err.push([k, 'norow']); continue; }
         rows[k].click(); for (let w = 0; w < 25; w++) { await sleep(1000); if (location.href.includes('GameDetails') && window.__blocks().length > 50) break; }
+        const first = String((list[k] && list[k].h) || '').split(' ')[0].toLowerCase(), okHead = () => window.__fbHead().join(' ').toLowerCase().includes(first);
+        for (let w = 0; w < 12 && !okHead(); w++) await sleep(1000);   // המתנה עד שהעמוד הוא של המשחק הנכון (לא של הקודם)
+        if (!okHead()) { st.err.push([k, 'wrong-page']); history.back(); await sleep(3500); if (!window.__rowSel().length) { history.back(); await sleep(3000); } st.done = n + 1; localStorage.__FBS = JSON.stringify(st); continue; }
         const g = await window.__fbGame(); g.h = list[k] && list[k].h; g.a = list[k] && list[k].a; g.date = list[k] && list[k].date; g.time = list[k] && list[k].time; const F = JSON.parse(localStorage.__FB || '{}'); F[g.gid] = g; localStorage.__FB = JSON.stringify(F);
         history.back(); await sleep(3500); if (!window.__rowSel().length) { history.back(); await sleep(3000); }
       } catch (e) { st.err.push([k, String(e)]); }
