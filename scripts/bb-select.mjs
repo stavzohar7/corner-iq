@@ -46,13 +46,24 @@ const strong = pickN(new Set()), second = pickN(new Set(strong.map(c => c.key + 
 const leg = (c, sp) => ({ sport: sp, id: c.game.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, p: c.pb, ev: c.ev, why: '' });
 const bySport = c => c.game.comp === 103 ? 'n' : 'e';
 const spec = { date, strong: {}, second: {} };
+// טפסים חזקים: עד 3 משחקים. הימור שני באותו משחק נוסף רק אם הוא באמת חזק (רף גבוה) ולא סותר את הראשון.
+// זוגות מותרים: סך נקודות "מתחת" + הנדיקאפ מארחת, או נקודות מארחת "מעל" + הנדיקאפ מארחת.
+const PAIR_MIN = 0.62, kindOf = c => c.key.split('|')[0];
+const okPair = (x, y) => { const k = [kindOf(x), kindOf(y)].sort().join('+'); return k === 'spread+total' || k === 'spread+th'; };
+function pickBB(T, exclGames) {
+  const byGame = new Map(); for (const c of T) { if (exclGames.has(c.game.id)) continue; (byGame.get(c.game.id) || byGame.set(c.game.id, []).get(c.game.id)).push(c); }
+  const opts = [];
+  for (const L of byGame.values()) { L.sort((x, y) => y.pb - x.pb); const first = L[0], partner = L.slice(1).find(y => y.pb >= PAIR_MIN && okPair(first, y));
+    opts.push({ sc: first.pb + (partner ? 0.04 : 0), id: first.game.id, legs: partner ? [first, partner] : [first] }); }
+  return opts.sort((x, y) => y.sc - x.sc);
+}
 for (const sp of ['n', 'e']) {
-  const S = strong.filter(c => bySport(c) === sp); const T = pool.filter(c => bySport(c) === sp);
-  const pick3 = excl => { const out = [], used = new Set(); for (const c of T) { if (excl.has(c.key + c.game.id) || used.has(c.game.id)) continue; used.add(c.game.id); out.push(c); if (out.length === 3) break; }
-    // מעט משחקים ביום (יורוליג): משלימים עד 3 הימורים ממשחק שכבר נבחר, בסוג אחר (סך / נקודות קבוצה / הנדיקאפ)
-    if (sp === 'e' && out.length < 3) for (const c of T) { if (out.length === 3) break; if (excl.has(c.key + c.game.id) || out.some(x => x.game.id === c.game.id && x.key.split('|')[0] === c.key.split('|')[0])) continue; if (!out.some(x => x.game.id === c.game.id)) continue; out.push(c); }
-    return out; };
-  const a = pick3(new Set()); if (a.length === 3 || (sp === 'e' && a.length >= 1)) { spec.strong[sp] = a.map(c => leg(c, sp)); const b = pick3(new Set(a.map(c => c.key + c.game.id))); if (b.length === 3 && sp !== 'e') spec.second[sp] = b.map(c => leg(c, sp)); }
+  const T = pool.filter(c => bySport(c) === sp);
+  const A = pickBB(T, new Set()).slice(0, 3);
+  if (A.length === 3 || (sp === 'e' && A.length >= 1)) {
+    spec.strong[sp] = A.flatMap(o => o.legs).map(c => leg(c, sp));
+    if (sp !== 'e') { const used = new Set(A.map(o => o.id)), B = pickBB(T, used).slice(0, 3); if (B.length === 3) spec.second[sp] = B.flatMap(o => o.legs).map(c => leg(c, sp)); }
+  }
 }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `bb-spec-${date}.json`), JSON.stringify(spec, null, 1));
 console.log(`מועמדים: ${cands.length}, עוברים: ${pool.length}`);

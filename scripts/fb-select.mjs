@@ -105,32 +105,29 @@ function pick3(pool, avoid = new Set(), avoidGames = new Set()) {
 const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: c.why });
 const total = L => Math.round(L.reduce((p, c) => p * c.odds, 1) * 100) / 100;
 const spec = { date, strong: {}, second: {}, win: [], fixed: [] }, seen = new Set(), sigOf = L => L.map(legSig).sort().join(',');
-// טפסים חזקים: 3 משחקים, ובכל משחק 2 הימורים משולבים (אחד על תוצאה/שערים ואחד על קרנות/בעיטות, או שניים משני מדדי ספירה שונים).
-// ההימורים מאותו משחק מסוג שונה כדי ש-fivebet יאפשר לשלב אותם בקופון אחד.
+// טפסים חזקים: 3 משחקים. הימור שני באותו משחק נוסף רק אם הוא באמת חזק (רף גבוה יותר) ומסוג שונה, כדי ש-fivebet יאפשר לשלב אותו בקופון אחד.
+// אם אין הימור שני חזק, המשחק נשאר עם הימור אחד.
 const isCnt = c => c.stat !== 'g';
+const PAIR_MIN = 0.62;
 function pickGames(pool, avoidGames = new Set(), nGames = 3) {
   for (const min of [0.6, 0.57, 0.54, 0.5]) {
     const byGame = new Map();
     for (const c of pool.filter(c => c.pb >= min && !avoidGames.has(gid(c)))) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
     const opts = [];
     for (const [g, L] of byGame) {
-      L.sort((x, y) => y.rank - x.rank); let best = null;
-      for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) {
-        const x = L[i], y = L[j]; if (x.key === y.key) continue;
-        const okPair = (!isCnt(x) && isCnt(y)) || (isCnt(x) && !isCnt(y)) || (isCnt(x) && isCnt(y) && x.stat !== y.stat); if (!okPair) continue;
-        const sc = x.pb * y.pb; if (!best || sc > best.sc) best = { sc, legs: [x, y] };
-      }
-      if (best) opts.push(best);
+      L.sort((x, y) => y.rank - x.rank); const first = L[0];
+      const partner = L.slice(1).find(y => y.pb >= PAIR_MIN && y.key !== first.key && ((!isCnt(first) && isCnt(y)) || (isCnt(first) && !isCnt(y)) || (isCnt(first) && isCnt(y) && first.stat !== y.stat)));
+      opts.push({ sc: first.pb + (partner ? 0.04 : 0), legs: partner ? [first, partner] : [first] });
     }
     opts.sort((x, y) => y.sc - x.sc);
     if (opts.length >= nGames) return opts.slice(0, nGames).flatMap(o => o.legs);
   }
   return [];
 }
-let strong = pickGames(cands); if (strong.length < 4) strong = pick3(cands);
+let strong = pickGames(cands); if (strong.length < 3) strong = pick3(cands);
 if (strong.length) { spec.strong.f = strong.map(toLeg); seen.add(sigOf(strong)); }
 const strongGames = new Set(strong.map(gid));
-let second = pickGames(cands, strongGames); if (second.length < 4) second = pick3(cands, new Set(strong.map(legSig)), strongGames);
+let second = pickGames(cands, strongGames); if (second.length < 3) second = pick3(cands, new Set(strong.map(legSig)), strongGames);
 if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second)); }
 // טפסי שעות: צברים של עד שעה וחצי בין תחילות המשחקים
 { const fx = [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].filter(f => f.ts * 1000 > Date.now()).sort((a, b) => a.ts - b.ts);
