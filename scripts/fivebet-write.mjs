@@ -19,7 +19,7 @@ let day = slips.days.find(d => d.date === date);
 if (!day) { const b = () => ({ legs: [], total: null, res: null }); day = { date, final: false, k: { strong: { f: b(), n: b(), e: b() }, second: { f: b(), n: b(), e: b() }, win: [], lg: [] } }; slips.days.push(day); }
 const full = l => {
   const fx = (l.sport === 'f' ? foot : bb).fixtures.find(f => String(f.id) === String(l.id)); if (!fx) throw new Error('משחק לא נמצא: ' + l.id);
-  if (!(l.odds >= 1.25)) throw new Error("יחס מתחת ל-1.25: " + l.label);
+  if (!(l.odds >= 1.2)) throw new Error("יחס מתחת ל-1.2: " + l.label);
   if (fx.ts * 1000 < Date.now()) throw new Error('המשחק כבר התחיל: ' + l.label);
   const [a, b, c] = l.key.split('|');
   const o = { sport: l.sport, id: fx.id, mi: -1, key: l.key, kind: l.sport === 'f' ? [a, b, c].join('|') : a + '|' + b, label: l.label, game: clean(fx.home.name) + ' – ' + clean(fx.away.name), ts: fx.ts, odds: l.odds, score: l.score || 6, p: l.p || 0, ev: l.ev || 0, src: 'fivebet' };
@@ -29,7 +29,9 @@ const full = l => {
   return o;
 };
 const tot = L => Math.round(L.reduce((x, l) => x * l.odds, 1) * 100) / 100;
-const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 6) throw new Error('טופס חייב 1 עד 6 הימורים'); const L = legs.map(full); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
+// כללי יחס (כדורגל): הימור בודד במשחק לפחות 1.4. כמה הימורים באותו משחק: יחס משותף לפחות 1.8
+const checkOdds = L => { const g = {}; for (const l of L) (g[l.id] = g[l.id] || []).push(l); for (const A of Object.values(g)) { const t = A.reduce((x, l) => x * l.odds, 1); if (A[0].sport === 'f' && (A.length === 1 ? A[0].odds < 1.4 : t < 1.8)) throw new Error('יחס נמוך מדי: ' + A.map(l => l.label).join(' + ') + ' (' + t.toFixed(2) + ')'); } };
+const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 6) throw new Error('טופס חייב 1 עד 6 הימורים'); const L = legs.map(full); checkOdds(L); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
 // טפסים שאחד המשחקים שלהם כבר התחיל לא נדרסים (הרצה חוזרת מוסיפה/מרעננת רק את מה שעוד לא התחיל)
 const started = S => S && S.legs && S.legs.some(l => l.ts * 1000 < Date.now());
 for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) { if (started(day.k[lv][sp])) continue; day.k[lv][sp] = mk(legs); }

@@ -56,9 +56,10 @@ for (const { G, f } of matched) {
   if (f.ts * 1000 < Date.now() + 10 * 60e3 || !f.exp) continue;
   const E = f.exp, dist = {}; for (const st of ['g', 'c', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
   const LGA = Object.fromEntries(["g", "c", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
-  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.25 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA), pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); if (sf.note) why = why + ' סגנון: ' + sf.note + '.';
+  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); 
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
-    cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
+    cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, note: sf.note, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
+  const ahWhy = (name, opp, v, nm) => v > 0 ? `${name} מקבלת יתרון התחלתי של ${v} ${nm}, ולכן ההימור מפסיד רק אם ${opp} מנצחת בהפרש של יותר מ-${v} ${nm}.` : v < 0 ? `${name} צריכה לנצח בהפרש של יותר מ-${-v} ${nm} כדי שההימור יעבור.` : `${name} צריכה לנצח ב${nm} (תיקו = החזר).`;
   const ladders = (stat, L) => {
     const D = dist[stat]; if (!D || !L) return; const e = D.e, nm = STAT_HE[stat];
     const sum = (arr, fn) => arr.reduce((s, p, i) => s + fn(i) * p, 0);
@@ -71,8 +72,8 @@ for (const { G, f } of matched) {
     for (const [ln, o1, o2] of L.hc || []) { const diff = new Map(); D.h.forEach((x, i) => D.a.forEach((y, j) => { diff.set(i - j, (diff.get(i - j) || 0) + x * y); }));
       const pHome = wl(d => Math.sign(d + ln), [...diff.entries()]), pAway = 1 - pHome, cat = stat === 'g' ? 'hc-g' : 'hc-o';
       const hl = (name, v) => v === 0 ? `${name} מנצחת ב${nm} (תיקו = החזר)` : `${name} ${v > 0 ? '+' : ''}${v} הנדיקאפ ${nm}`;
-      add(stat, `${stat}|ah|home|${ln}`, hl(hn(f), ln), o1, pHome, fair2(o1, o2), cat, `לפי החישוב שלנו ל${hn(f)} סיכוי טוב לכסות את ההנדיקאפ (${ln > 0 ? '+' : ''}${ln}).`);
-      add(stat, `${stat}|ah|away|${-ln}`, hl(an(f), -ln), o2, pAway, fair2(o2, o1), cat, `לפי החישוב שלנו ל${an(f)} סיכוי טוב לכסות את ההנדיקאפ (${-ln > 0 ? '+' : ''}${-ln}).`); }
+      add(stat, `${stat}|ah|home|${ln}`, hl(hn(f), ln), o1, pHome, fair2(o1, o2), cat, ahWhy(hn(f), an(f), ln, nm));
+      add(stat, `${stat}|ah|away|${-ln}`, hl(an(f), -ln), o2, pAway, fair2(o2, o1), cat, ahWhy(an(f), hn(f), -ln, nm)); }
   };
   ladders('g', G.main); ladders('c', G.c); ladders('sh', G.sh); ladders('sot', G.sot);
   // ----- שערים: תוצאה, כפולה, שתיהן כובשות, צירופים -----
@@ -80,7 +81,7 @@ for (const { G, f } of matched) {
   const M = G.main || {}, H = D.h, A = D.a;
   const joint = fn => { let p = 0; H.forEach((ph, i) => A.forEach((pa, j) => { if (fn(i, j)) p += ph * pa; })); return p; };
   const DC = { '1X': (i, j) => i >= j, X2: (i, j) => i <= j, '12': (i, j) => i !== j }, DCN = { '1X': () => `${hn(f)} לא מפסידה`, X2: () => `${an(f)} לא מפסידה`, '12': () => 'בלי תיקו (יש מנצחת)' };
-  for (const [k, o] of Object.entries(M.dc || {})) { if (!DC[k]) continue; const pm = joint(DC[k]); add('g', `g|dc|${k.toLowerCase()}|`, `${DCN[k]()} (${k})`, o, pm, 1 / o / MARGIN, k === '1X' ? 'dc-1x' : 'dc-' + k.toLowerCase(), `לפי החישוב שלנו הסיכוי לזה גבוה (${DCN[k]()}).`); }
+  for (const [k, o] of Object.entries(M.dc || {})) { if (!DC[k]) continue; const pm = joint(DC[k]); add('g', `g|dc|${k.toLowerCase()}|`, `${DCN[k]()} (${k})`, o, pm, 1 / o / MARGIN, k === '1X' ? 'dc-1x' : 'dc-' + k.toLowerCase(), (k === '1X' ? `ההימור מפסיד רק אם ${an(f)} מנצחת.` : k === 'X2' ? `ההימור מפסיד רק אם ${hn(f)} מנצחת.` : 'ההימור מפסיד רק אם המשחק נגמר בתיקו.')); }
   if (M.r) { const [w1, , w2] = M.r; add('g', 'g|1x2|home|', `${hn(f)} מנצחת`, w1, joint((i, j) => i > j), 1 / w1 / MARGIN, 'res', `לפי החישוב שלנו ${hn(f)} הפייבוריטית.`); add('g', 'g|1x2|away|', `${an(f)} מנצחת`, w2, joint((i, j) => i < j), 1 / w2 / MARGIN, 'res', `לפי החישוב שלנו ${an(f)} הפייבוריטית.`); }
   if (M.btts) { const py = joint((i, j) => i > 0 && j > 0); add('g', 'g|btts|yes|', 'שתי הקבוצות כובשות', M.btts[0], py, fair2(M.btts[0], M.btts[1]), 'btts', 'לפי החישוב שלנו לשתי הקבוצות יש סיכוי טוב לכבוש.'); add('g', 'g|btts|no|', 'לפחות קבוצה אחת לא כובשת', M.btts[1], 1 - py, fair2(M.btts[1], M.btts[0]), 'btts', 'לפי החישוב שלנו יש סיכוי טוב שלפחות קבוצה אחת לא תכבוש.'); }
   for (const [grp, arr, tag] of [['dct', M.dct, 'dc'], ['rt', M.rt, 'rt']]) for (const [r, ou, ln, o] of arr || []) {
@@ -99,7 +100,8 @@ const ilDow = ts => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem
 const gid = c => String(c.f.id), legSig = c => gid(c) + '|' + c.key;
 const famOf = c => c.stat === 'g' ? (c.key.startsWith('g|combo') || c.key.startsWith('g|dc') || c.key.startsWith('g|1x2') || c.key.startsWith('g|btts') ? 'res' : 'goals') : c.stat;
 // בוחר 3 הימורים מרשימת מועמדים: קודם ממשחקים שונים, אחר כך (אם צריך) הימור שני מאותו משחק על מדד אחר; מוריד את הרף בהדרגה
-function pick3(pool, avoid = new Set(), avoidGames = new Set()) {
+function pick3(pool0, avoid = new Set(), avoidGames = new Set()) {
+  const pool = pool0.filter(c => c.odds >= 1.4);   // הימור בודד במשחק: יחס 1.4 לפחות
   for (const min of [0.58, 0.55, 0.52, 0.5]) {
     const L = pool.filter(c => c.pb >= min && !avoid.has(legSig(c))).sort((a, b) => b.rank - a.rank), out = [], games = new Set();
     for (const c of L) { if (out.length === 3) break; if (games.has(gid(c)) || avoidGames.has(gid(c))) continue; out.push(c); games.add(gid(c)); }
@@ -108,7 +110,17 @@ function pick3(pool, avoid = new Set(), avoidGames = new Set()) {
   }
   return [];
 }
-const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: c.why });
+// נימוק שמבין את המשחק: איזה משחק זה, מה הנתונים של הקבוצות (תמיד "בממוצע"), חיסורים, ולמה דווקא ההימור הזה
+const cl = x => String(x || '').replace(/[⁦-⁩]/g, '').trim(), endDot = x => /[.!?]$/.test(x) ? x : x + '.';
+function whyOf(c) {
+  const S = (c.f.story || []).map(cl), pick = re => S.find(x => re.test(x)) || '';
+  const nature = S[0] || '', goals = pick(/^בשערים/), corners = pick(/קרנות/), shots = pick(/^בבעיטות/), inj = pick(/^חיסורים/), form = pick(/ניצחונות ב-|בלי ניצחון|מרגישה/);
+  const parts = c.stat === 'g' ? [nature, goals, c.note, inj, c.why] : c.stat === 'c' ? [nature, corners, c.note, c.why] : [shots, c.note, c.why];
+  const seen = new Set(), out = [];
+  for (const p of parts) { const t = cl(p); if (!t || seen.has(t)) continue; seen.add(t); out.push(endDot(t)); }
+  return out.slice(0, 4).join(' ');
+}
+const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: whyOf(c) });
 const total = L => Math.round(L.reduce((p, c) => p * c.odds, 1) * 100) / 100;
 const spec = { date, strong: {}, second: {}, win: [], fixed: [] }, seen = new Set(), sigOf = L => L.map(legSig).sort().join(',');
 // טפסים חזקים: 3 משחקים. בכל משחק נבחר ההימור החזק ביותר, מכל סוג (תוצאה, שערים, קרנות, בעיטות, צירופים).
@@ -134,14 +146,20 @@ function pairProb(x, y) {
     const mx = Math.max(0.01, x.pm), my = Math.max(0.01, y.pm); return Math.min(0.95, p * (x.pb / mx) * (y.pb / my)); } }
   return x.pb * y.pb; }
 function pickGames(pool, avoidGames = new Set(), nGames = 3) {
+  // כללי יחס: הימור בודד במשחק לפחות 1.4. שני הימורים באותו משחק: כל אחד לפחות 1.2 ויחד לפחות 1.8.
   for (const min of [0.6, 0.57, 0.54, 0.5]) {
     const byGame = new Map();
     for (const c of pool.filter(c => c.pb >= min && !avoidGames.has(gid(c)))) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
     const opts = [];
     for (const L of byGame.values()) {
-      L.sort((x, y) => y.rank - x.rank); const first = L[0]; let partner = null, pp = 0;
-      for (const y of L.slice(1)) { if (y.pb < PAIR_MIN || y.key === first.key || famKey(y) === famKey(first)) continue; const p = pairProb(first, y); if (p >= PAIR_JOINT_MIN && p > pp) { partner = y; pp = p; } }
-      opts.push({ sc: first.pb + (partner ? 0.04 : 0), legs: partner ? [first, partner] : [first] });
+      L.sort((x, y) => y.rank - x.rank);
+      let pair = null;
+      for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j];
+        if (x.key === y.key || famKey(x) === famKey(y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue;
+        const p = pairProb(x, y); if (p < PAIR_JOINT_MIN) continue; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
+      const single = L.find(c => c.odds >= 1.4);
+      if (pair && (!single || pair.legs.some(c => c === single) || pair.p >= single.pb * 0.62)) opts.push({ sc: Math.max(pair.legs[0].pb, pair.legs[1].pb) + 0.04, legs: pair.legs });
+      else if (single) opts.push({ sc: single.pb, legs: [single] });
     }
     opts.sort((x, y) => y.sc - x.sc);
     if (opts.length >= nGames) return opts.slice(0, nGames).flatMap(o => o.legs);
