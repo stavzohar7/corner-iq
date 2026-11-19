@@ -30,7 +30,7 @@ const full = l => {
 };
 const tot = L => Math.round(L.reduce((x, l) => x * l.odds, 1) * 100) / 100;
 // כללי יחס (כדורגל): הימור בודד במשחק לפחות 1.4. כמה הימורים באותו משחק: יחס משותף לפחות 1.8
-const checkOdds = L => { const g = {}; for (const l of L) (g[l.id] = g[l.id] || []).push(l); for (const A of Object.values(g)) { const t = A.reduce((x, l) => x * l.odds, 1); if (A[0].sport === 'f' && (A.length === 1 ? A[0].odds < 1.4 : t < 1.8)) throw new Error('יחס נמוך מדי: ' + A.map(l => l.label).join(' + ') + ' (' + t.toFixed(2) + ')'); } };
+const checkOdds = L => { const g = {}; for (const l of L) (g[l.id] = g[l.id] || []).push(l); for (const A of Object.values(g)) { const t = A.reduce((x, l) => x * l.odds, 1); if (A.length === 1 ? A[0].odds < 1.4 : t < 1.8) throw new Error('יחס נמוך מדי: ' + A.map(l => l.label).join(' + ') + ' (' + t.toFixed(2) + ')'); } };
 const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 6) throw new Error('טופס חייב 1 עד 6 הימורים'); const L = legs.map(full); checkOdds(L); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
 // טפסים שאחד המשחקים שלהם כבר התחיל לא נדרסים (הרצה חוזרת מוסיפה/מרעננת רק את מה שעוד לא התחיל)
 const started = S => S && S.legs && S.legs.some(l => l.ts * 1000 < Date.now());
