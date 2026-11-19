@@ -254,12 +254,14 @@ export function runSlip({ root, today, log = () => {} }) {
     day.k.strong[sp].legs = A.length === 3 ? A : []; day.k.second[sp].legs = noSecond ? [] : B;   // כל טופס הוא בדיוק 3 הימורים: לא 2 ולא 4. אם אין 3 חזקים, אין טופס
   }
   // כדורסל: NBA ויורוליג נפרדים. טופס יורוליג מופיע רק עם 3 רגליים. בלי יורוליג יש טופס שני של NBA, ובלי NBA יש טופס שני של יורוליג
-  { const K = day.k, okN = K.strong.n.legs.length >= 3, okE = K.strong.e.legs.length >= 3;
-    if (!okE) { K.strong.e = blank(); K.second.e = blank(); }
-    if (!okN && okE) { K.strong.n = blank(); K.second.n = blank(); }
-    if (okN && okE) { K.second.n = blank(); K.second.e = blank(); }
-    if (okN && !okE) K.second.e = blank();
-    if (!okN && okE) K.second.n = blank(); }
+  { const K = day.k, isFb = x => x.legs.length && x.legs.every(l => l.src === 'fivebet'), okN = K.strong.n.legs.length >= 3 || isFb(K.strong.n), okE = K.strong.e.legs.length >= 3 || isFb(K.strong.e);
+    // טפסים לפי יחסי fivebet (כולל טופס יורוליג קצר של 1 עד 2 הימורים) נשארים כמו שהם. את השאר מצמצמים כמו קודם
+    const drop = (sp, lv) => { if (!isFb(K[lv][sp])) K[lv][sp] = blank(); };
+    if (!okE) { drop('e', 'strong'); drop('e', 'second'); }
+    if (!okN && okE) { drop('n', 'strong'); drop('n', 'second'); }
+    if (okN && okE) { drop('n', 'second'); drop('e', 'second'); }
+    if (okN && !okE) drop('e', 'second');
+    if (!okN && okE) drop('n', 'second'); }
   // כדורגל: טפסי שעות (ביום עמוס). אחרי הנעילה לא משתנים
   if (!day.final) {
     const fc = cands.filter(c => c.sport === 'f');

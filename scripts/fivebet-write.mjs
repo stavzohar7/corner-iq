@@ -29,7 +29,7 @@ const full = l => {
   return o;
 };
 const tot = L => Math.round(L.reduce((x, l) => x * l.odds, 1) * 100) / 100;
-const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 3) throw new Error('טופס חייב 1 עד 3 הימורים'); const L = legs.map(full); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
+const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 6) throw new Error('טופס חייב 1 עד 6 הימורים'); const L = legs.map(full); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
 // טפסים שאחד המשחקים שלהם כבר התחיל לא נדרסים (הרצה חוזרת מוסיפה/מרעננת רק את מה שעוד לא התחיל)
 const started = S => S && S.legs && S.legs.some(l => l.ts * 1000 < Date.now());
 for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) { if (started(day.k[lv][sp])) continue; day.k[lv][sp] = mk(legs); }
