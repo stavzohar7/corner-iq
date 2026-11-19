@@ -30,9 +30,12 @@ const full = l => {
 };
 const tot = L => Math.round(L.reduce((x, l) => x * l.odds, 1) * 100) / 100;
 const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 3) throw new Error('טופס חייב 1 עד 3 הימורים'); const L = legs.map(full); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
-for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) day.k[lv][sp] = mk(legs);
-if (spec.win) day.k.win = spec.win.map((w, i) => ({ id: 'w' + (i + 1), ...mk(w.legs), label: w.label }));
-if (spec.fixed) day.k.lg = spec.fixed.map((w, i) => ({ id: 'F' + (i + 1), ...mk(w.legs), label: w.label, ...(w.kind ? { kind: w.kind } : {}) }));   // טפסים קבועים וטופס לכל ליגה
+// טפסים שאחד המשחקים שלהם כבר התחיל לא נדרסים (הרצה חוזרת מוסיפה/מרעננת רק את מה שעוד לא התחיל)
+const started = S => S && S.legs && S.legs.some(l => l.ts * 1000 < Date.now());
+for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) { if (started(day.k[lv][sp])) continue; day.k[lv][sp] = mk(legs); }
+const keepStarted = old => (old || []).filter(started);
+if (spec.win) { const keep = keepStarted(day.k.win), labels = new Set(keep.map(w => w.label)); day.k.win = [...keep, ...spec.win.filter(w => !labels.has(w.label)).map(w => ({ ...mk(w.legs), label: w.label }))].map((w, i) => ({ ...w, id: 'w' + (i + 1) })); }
+if (spec.fixed) { const keep = keepStarted(day.k.lg), labels = new Set(keep.map(w => w.label)); day.k.lg = [...keep, ...spec.fixed.filter(w => !labels.has(w.label)).map(w => ({ ...mk(w.legs), label: w.label, ...(w.kind ? { kind: w.kind } : {}) }))].map((w, i) => ({ ...w, id: 'F' + (i + 1) })); }   // טפסים קבועים וטופס לכל ליגה
 slips.updated = new Date().toISOString();
 fs.writeFileSync(path.join(ROOT, 'data', 'slips.json'), JSON.stringify(slips));
 console.log('נכתב:', Object.entries(spec.strong || {}).map(([k, v]) => 'חזק ' + k + ' ' + tot(v.map(full))).join(' · '), Object.entries(spec.second || {}).map(([k, v]) => 'שני ' + k + ' ' + tot(v.map(full))).join(' · '));
