@@ -22,6 +22,10 @@ const games = files.flatMap(f => readJson(path.join(dir, f)));
 const day = readJson(path.join(ROOT, 'data', 'days', `${date}.json`));
 const teams = Object.fromEntries(Object.entries(readJson(path.join(ROOT, 'data', 'cache', 'matches.json')).teams).filter(([k]) => String(k).includes(':')));
 const resolve = buildResolver(teams);
+// כיול מהתוצאות האמיתיות שלנו (data/knowledge/calibration.json): לכל סוג הימור, כמה פעמים עבר מול כמה שהמודל צפה.
+// תיקון הסיכוי לפי ההפרש, מוקטן כשיש מעט דוגמאות. סוג שאין עליו היסטוריה מקבל הורדה קטנה ("לא הוכח").
+let CAL = {}; try { CAL = readJson(path.join(ROOT, 'data', 'knowledge', 'calibration.json')).sports.f.kinds || {}; } catch (e) {}
+const calFix = key => { const K = CAL[key.split('|').slice(0, 3).join('|')]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 15))); };
 
 // ---------- התפלגויות ----------
 const PHI = { g: 1.15, c: 1.45, sh: 1.5, sot: 1.4 };
@@ -50,7 +54,7 @@ const STAT_HE = { g: 'שערים', c: 'קרנות', sh: 'בעיטות', sot: 'ב
 for (const { G, f } of matched) {
   if (f.ts * 1000 < Date.now() + 10 * 60e3 || !f.exp) continue;
   const E = f.exp, dist = {}; for (const st of ['g', 'c', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
-  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.45 && odds <= 5)) return; const pb = 0.5 * pm + 0.5 * ps, gap = Math.abs(pm - ps); if (gap > 0.2) return;
+  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.45 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key)));
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
     cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why }); };
   const ladders = (stat, L) => {
