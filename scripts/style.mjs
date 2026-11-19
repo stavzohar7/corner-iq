@@ -24,7 +24,7 @@ export function profile(team, isHome, lg) {
 export function styleFit(key, nameH, nameA, PH, PA) {
   if (!PH || !PA) return { d: 0, note: '' };
   const [stat, grp, side] = key.split('|'), dir = side === 'over' ? 1 : side === 'under' ? -1 : 0;
-  const sd = x => clamp(x, -0.06, 0.06);
+  const sd = x => x < 0 ? clamp(x * 2, -0.1, 0) : clamp(x, 0, 0.06);   // סתירה בין הסגנון להימור נענשת בכפול
   const line = (P, nm) => P.tags.length ? `${nm}: ${P.tags.slice(0, 2).join(', ')}` : '';
   const both = (a, b) => [a, b].filter(Boolean).join('. ');
   const openAvg = (PH.open + PA.open) / 2;

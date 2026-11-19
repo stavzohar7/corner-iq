@@ -55,7 +55,7 @@ const STAT_HE = { g: 'שערים', c: 'קרנות', sh: 'בעיטות', sot: 'ב
 for (const { G, f } of matched) {
   if (f.ts * 1000 < Date.now() + 10 * 60e3 || !f.exp) continue;
   const E = f.exp, dist = {}; for (const st of ['g', 'c', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
-  const PH = profile(f.home, true, E.lg), PA = profile(f.away, false, E.lg);
+  const LGA = Object.fromEntries(["g", "c", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
   const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.25 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA), pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); if (sf.note) why = why + ' סגנון: ' + sf.note + '.';
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
     cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
