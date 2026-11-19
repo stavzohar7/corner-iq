@@ -19,7 +19,7 @@ let day = slips.days.find(d => d.date === date);
 if (!day) { const b = () => ({ legs: [], total: null, res: null }); day = { date, final: false, k: { strong: { f: b(), n: b(), e: b() }, second: { f: b(), n: b(), e: b() }, win: [], lg: [] } }; slips.days.push(day); }
 const full = l => {
   const fx = (l.sport === 'f' ? foot : bb).fixtures.find(f => String(f.id) === String(l.id)); if (!fx) throw new Error('משחק לא נמצא: ' + l.id);
-  if (!(l.odds >= 1.45)) throw new Error('יחס מתחת ל-1.45: ' + l.label);
+  if (!(l.odds >= 1.25)) throw new Error("יחס מתחת ל-1.25: " + l.label);
   if (fx.ts * 1000 < Date.now()) throw new Error('המשחק כבר התחיל: ' + l.label);
   const [a, b, c] = l.key.split('|');
   const o = { sport: l.sport, id: fx.id, mi: -1, key: l.key, kind: l.sport === 'f' ? [a, b, c].join('|') : a + '|' + b, label: l.label, game: clean(fx.home.name) + ' – ' + clean(fx.away.name), ts: fx.ts, odds: l.odds, score: l.score || 6, p: l.p || 0, ev: l.ev || 0, src: 'fivebet' };

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildResolver } from './context.mjs';
+import { profile, styleFit } from './style.mjs';
 import { LEAGUES } from './config.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -54,9 +55,10 @@ const STAT_HE = { g: 'שערים', c: 'קרנות', sh: 'בעיטות', sot: 'ב
 for (const { G, f } of matched) {
   if (f.ts * 1000 < Date.now() + 10 * 60e3 || !f.exp) continue;
   const E = f.exp, dist = {}; for (const st of ['g', 'c', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
-  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.45 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key)));
+  const PH = profile(f.home, true, E.lg), PA = profile(f.away, false, E.lg);
+  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.25 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA), pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); if (sf.note) why = why + ' סגנון: ' + sf.note + '.';
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
-    cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why }); };
+    cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
   const ladders = (stat, L) => {
     const D = dist[stat]; if (!D || !L) return; const e = D.e, nm = STAT_HE[stat];
     const sum = (arr, fn) => arr.reduce((s, p, i) => s + fn(i) * p, 0);
@@ -109,18 +111,36 @@ function pick3(pool, avoid = new Set(), avoidGames = new Set()) {
 const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: c.why });
 const total = L => Math.round(L.reduce((p, c) => p * c.odds, 1) * 100) / 100;
 const spec = { date, strong: {}, second: {}, win: [], fixed: [] }, seen = new Set(), sigOf = L => L.map(legSig).sort().join(',');
-// טפסים חזקים: 3 משחקים. הימור שני באותו משחק נוסף רק אם הוא באמת חזק (רף גבוה יותר) ומסוג שונה, כדי ש-fivebet יאפשר לשלב אותו בקופון אחד.
-// אם אין הימור שני חזק, המשחק נשאר עם הימור אחד.
-const isCnt = c => c.stat !== 'g';
-const PAIR_MIN = 0.62;
+// טפסים חזקים: 3 משחקים. בכל משחק נבחר ההימור החזק ביותר, מכל סוג (תוצאה, שערים, קרנות, בעיטות, צירופים).
+// הימור שני באותו משחק נוסף רק אם הוא גם חזק (רף גבוה יותר), מסוג שונה (לא שני הימורי תוצאה, ולא שני הימורים על אותו מדד), לא סותר את הראשון, ושניהם יחד עדיין סבירים.
+// אם אין הימור שני חזק, המשחק נשאר עם הימור אחד, ובמשחק אחר אפשר שיהיו שניים.
+const PAIR_MIN = 0.62, PAIR_JOINT_MIN = 0.45;
+const grpOf = c => c.key.split('|')[1], resFam = c => ['dc', '1x2', 'combo'].includes(grpOf(c));
+const famKey = c => resFam(c) ? 'res' : c.stat + '|' + grpOf(c);
+const predOf = key => { const [st, grp, side, ln] = key.split('|'), L = parseFloat(ln);
+  if (st !== 'g') return null;
+  if (grp === 'total') return side === 'over' ? (i, j) => i + j > L : (i, j) => i + j < L;
+  if (grp === 'home') return side === 'over' ? (i) => i > L : (i) => i < L;
+  if (grp === 'away') return side === 'over' ? (i, j) => j > L : (i, j) => j < L;
+  if (grp === 'ah') return side === 'home' ? (i, j) => i - j + L > 0 : (i, j) => j - i + L > 0;
+  if (grp === 'dc') return { '1x': (i, j) => i >= j, x2: (i, j) => i <= j, '12': (i, j) => i !== j }[side] || null;
+  if (grp === '1x2') return side === 'home' ? (i, j) => i > j : (i, j) => i < j;
+  if (grp === 'btts') return side === 'yes' ? (i, j) => i > 0 && j > 0 : (i, j) => !(i > 0 && j > 0);
+  if (grp === 'combo') { const [r, ou] = side.split('_'), res = { '1x': (i, j) => i >= j, x2: (i, j) => i <= j, '12': (i, j) => i !== j, home: (i, j) => i > j, away: (i, j) => i < j, draw: (i, j) => i === j }[r]; return res ? (i, j) => res(i, j) && (ou === 'over' ? i + j > L : i + j < L) : null; }
+  return null; };
+// סיכוי שני ההימורים יחד: בשערים לפי חישוב משותף של התוצאה, אחרת כפל (קרנות ובעיטות בלתי תלויות בשערים בקירוב)
+function pairProb(x, y) {
+  if (x.dist && y.dist) { const px = predOf(x.key), py = predOf(y.key); if (px && py) { let p = 0; x.dist.h.forEach((ph, i) => x.dist.a.forEach((pa, j) => { if (px(i, j) && py(i, j)) p += ph * pa; }));
+    const mx = Math.max(0.01, x.pm), my = Math.max(0.01, y.pm); return Math.min(0.95, p * (x.pb / mx) * (y.pb / my)); } }
+  return x.pb * y.pb; }
 function pickGames(pool, avoidGames = new Set(), nGames = 3) {
   for (const min of [0.6, 0.57, 0.54, 0.5]) {
     const byGame = new Map();
     for (const c of pool.filter(c => c.pb >= min && !avoidGames.has(gid(c)))) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
     const opts = [];
-    for (const [g, L] of byGame) {
-      L.sort((x, y) => y.rank - x.rank); const first = L[0];
-      const partner = L.slice(1).find(y => y.pb >= PAIR_MIN && y.key !== first.key && ((!isCnt(first) && isCnt(y)) || (isCnt(first) && !isCnt(y)) || (isCnt(first) && isCnt(y) && first.stat !== y.stat)));
+    for (const L of byGame.values()) {
+      L.sort((x, y) => y.rank - x.rank); const first = L[0]; let partner = null, pp = 0;
+      for (const y of L.slice(1)) { if (y.pb < PAIR_MIN || y.key === first.key || famKey(y) === famKey(first)) continue; const p = pairProb(first, y); if (p >= PAIR_JOINT_MIN && p > pp) { partner = y; pp = p; } }
       opts.push({ sc: first.pb + (partner ? 0.04 : 0), legs: partner ? [first, partner] : [first] });
     }
     opts.sort((x, y) => y.sc - x.sc);
