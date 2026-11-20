@@ -171,3 +171,13 @@ details.banner summary { cursor: pointer; font-weight: 600; list-style: none; } 
   .tab { font-size: 12.5px; } .tab .ti { font-size: 23px; }
   h2 { font-size: 24px; } h1 { font-size: 22px; }
 }
+
+/* בורר קבוצות טפסים: מציג קבוצה אחת בכל פעם (הכי חזקים / קבועים / לפי שעות / לפי ליגה) */
+.segBar { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 10px; margin: 6px 0 2px; scrollbar-width: none; }
+.segBar::-webkit-scrollbar { display: none; }
+.segBtn { flex: 0 0 auto; border: 1.5px solid var(--line); background: var(--surface-1); color: var(--text-2); border-radius: 999px; padding: 10px 16px; font-weight: 800; font-size: 14.5px; min-height: 44px; white-space: nowrap; }
+.segBtn.on { background: var(--accent); color: #06241a; border-color: var(--accent); }
+.segN { display: inline-block; min-width: 20px; padding: 0 6px; margin-inline-start: 4px; border-radius: 999px; background: rgba(0,0,0,.18); font-size: 12px; text-align: center; }
+.segN:empty { display: none; }
+.paneHint { margin: 4px 2px 12px; }
+.slipPane[hidden] { display: none; }

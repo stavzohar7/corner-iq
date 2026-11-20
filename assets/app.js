@@ -320,19 +320,25 @@ function slipCardHtml(d, S, title, sub, cls) {
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
     '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : S.legs.every(l => l.est) ? 'משוער' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div><p class="muted slipFoot">100 ₪ משלמים ' + Math.round(100 * S.total) + ' ₪ · נתפס בערך פעם ב-' + once + ' טפסים' + (S.res === 'win' ? ' · <b class="pos">נתפס ✅</b>' : S.res === 'lose' ? ' · <b class="neg">נפל ❌</b>' : '') + '</p></div>';
 }
+function ciqSlipTab(btn, id) { const box = btn.closest('.slipGroups'); if (!box) return; box.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('on', b === btn)); box.querySelectorAll('.slipPane').forEach(p => { p.hidden = p.dataset.pane !== id; }); }
+window.ciqSlipTab = ciqSlipTab;
 function slipsHtml(s, sp) {
   if (!s || !s.k) return '';
   let cards = '', bet365 = false;
   for (const [lv, name, cls] of SLIP_LV) { const X = slipAt(s, lv, sp); if (X.legs.length) { cards += slipCardHtml(s, X, '📋 ' + name, lv === 'strong' ? 'שלושת ההימורים הכי חזקים' : 'חזק, אבל פחות מהחזק', cls); if (X.legs.some(l => l.src !== 'fivebet')) bet365 = true; } }
-  let html = cards ? '<div class="slipGrid">' + cards + '</div>' : '';
   const wins = sp === 'f' ? (s.k.win || []).filter(w => w.legs.length) : [], fixedAll = sp === 'f' ? (s.k.lg || []).filter(w => w.legs.length) : [], fixed = fixedAll.filter(w => w.kind !== 'league'), leagueSl = fixedAll.filter(w => w.kind === 'league');
-  if (fixed.length) html += '<h4 class="secSub" id="sl-fixed">📌 טפסים קבועים</h4><div class="slipGrid">' + fixed.map(w => slipCardHtml(s, w, '📌 ' + w.label, 'ההימורים הכי חזקים משם', 'slip2')).join('') + '</div>';
-  if (wins.length) html += '<h4 class="secSub" id="sl-win">⏱ טופס לפי שעות <span class="muted">· משחקים שמתחילים בטווח של עד שעה וחצי</span></h4><div class="slipGrid">' + wins.map(w => slipCardHtml(s, w, '⏱ ' + w.label, 'שלושה הימורים בטווח הזה', 'slip2')).join('') + '</div>';
-  if (leagueSl.length) html += '<h4 class="secSub" id="sl-lg">🏟 טופס חזק לכל ליגה <span class="muted">· מכל שעות המשחקים של הליגה באותו יום</span></h4><div class="slipGrid">' + leagueSl.map(w => slipCardHtml(s, w, '🏟 ' + w.label, 'שלושת ההימורים הכי חזקים בליגה', '')).join('') + '</div>';
-  if (!html) return '';
+  const grid = list => '<div class="slipGrid">' + list + '</div>';
+  const panes = [];   // [מזהה, כפתור, הסבר קצר, תוכן]
+  if (cards) panes.push(['top', '⭐ הכי חזקים', 'הטופס החזק והטופס השני של היום', grid(cards)]);
+  if (fixed.length) panes.push(['fixed', '📌 קבועים', 'טפסים קבועים של שבת: משחקי אותה שעה באותה ליגה', grid(fixed.map(w => slipCardHtml(s, w, '📌 ' + w.label, 'ההימורים הכי חזקים משם', 'slip2')).join(''))]);
+  if (wins.length) panes.push(['win', '⏱ לפי שעות', 'משחקים שמתחילים בטווח של עד שעה וחצי זה מזה', grid(wins.map(w => slipCardHtml(s, w, '⏱ ' + w.label, 'ההימורים הכי חזקים בטווח הזה', 'slip2')).join(''))]);
+  if (leagueSl.length) panes.push(['lg', '🏟 לפי ליגה', 'טופס חזק לכל ליגה, מכל שעות המשחקים שלה באותו יום', grid(leagueSl.map(w => slipCardHtml(s, w, '🏟 ' + w.label, 'ההימורים הכי חזקים בליגה', '')).join(''))]);
+  if (!panes.length) return '';
   if ([...wins, ...fixed, ...leagueSl].some(w => w.legs.some(l => l.src !== 'fivebet'))) bet365 = true;
-  const jumps = [fixed.length && ['sl-fixed', '📌 קבועים'], wins.length && ['sl-win', '⏱ לפי שעות'], leagueSl.length && ['sl-lg', '🏟 לפי ליגה']].filter(Boolean);
-  if (jumps.length > 1) html = '<div class="chips jumpBar"><span class="muted">קפיצה מהירה:</span>' + jumps.map(([id, t]) => '<button class="chip" type="button" onclick="document.getElementById(\'' + id + '\').scrollIntoView({behavior:\'smooth\',block:\'start\'})">' + t + '</button>').join('') + '</div>' + html;
+  let html;
+  if (panes.length === 1) html = panes[0][3];
+  else html = '<div class="slipGroups"><div class="segBar" role="tablist">' + panes.map((p, i) => '<button class="segBtn' + (i === 0 ? ' on' : '') + '" type="button" role="tab" onclick="ciqSlipTab(this,\'' + p[0] + '\')">' + p[1] + ' <span class="segN">' + (p[0] === 'top' ? '' : (p[0] === 'win' ? wins : p[0] === 'lg' ? leagueSl : fixed).length) + '</span></button>').join('') + '</div>' +
+    panes.map((p, i) => '<div class="slipPane" data-pane="' + p[0] + '"' + (i === 0 ? '' : ' hidden') + '><p class="sub2 paneHint">' + p[2] + '</p>' + p[3] + '</div>').join('') + '</div>';
   return html + '<p class="muted note1">' + (bet365 ? 'טופס שמסומן Bet365 מחושב לפי יחסי Bet365: אפשר להקליד ליד כל הימור את היחס שרשום באתר שלך, והיחס הכולל יתעדכן. ' : '') + (s.final ? 'הטפסים נעולים ולא ישתנו היום.' : 'הטפסים עדיין לא נעולים.') + '</p>';
 }
 async function getBBDay(date) {
