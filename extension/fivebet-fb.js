@@ -38,7 +38,7 @@ window.__fbMain = () => {
 window.__tab = async n => { const els = [...document.querySelectorAll('*')].filter(e => e.children.length === 0 && (e.innerText || '').trim() === n); const el = els.find(e => e.getBoundingClientRect().top < 600) || els[0]; if (el) { el.click(); await sleep(2500); } return !!el; };
 window.__fbHead = () => { const t = document.body.innerText, i = t.indexOf('\nMain\n'); return t.slice(Math.max(0, i - 260), i).split('\n').map(x => x.trim()).filter(x => x && x.length < 60).slice(-7); };
 // רשימת משחקי הליגה מעמוד הרשימה: [{h, a, date:'DD.MM', time:'H:MM'}] באותו סדר של שורות ה-"+NNNN"
-window.__fbList = () => { const t = document.body.innerText, out = [], re = /\n([^\n]+)\n([^\n]+)\n#\d+\n(\d\d\.\d\d)\n([\d:]+)\n[^\n]*\n\+\d+/g; let m; while ((m = re.exec(t))) out.push({ h: m[1].trim(), a: m[2].trim(), date: m[3], time: m[4] }); return out; };
+window.__fbList = () => { const t = document.body.innerText, out = [], re = /\n([^\n]+)\n([^\n]+)\n#\d+\n(\d\d\.\d\d)\n([\d:]+)\n(?:[^\n+][^\n]*\n)?\+\d+/g; let m; while ((m = re.exec(t))) out.push({ h: m[1].trim(), a: m[2].trim(), date: m[3], time: m[4] }); return out; };
 // קוראת את המשחק הפתוח
 window.__fbGame = async () => {
   const head = window.__fbHead(), slug = (location.href.match(/game=([^&]+)/) || [])[1] || '', gid = (location.href.match(/gameId=(\d+)/) || [])[1] || slug;
