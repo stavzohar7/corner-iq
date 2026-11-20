@@ -112,7 +112,10 @@ async function init() {
 async function loadDay(date) {
   state.day = await getJson('data/days/' + date + '.json');
   { let FB = {}; try { FB = (await getJson('data/fbodds/' + date + '.json')).odds || {}; } catch (e) {}   // רק יחסי fivebet אמיתיים: שום יחס משוער או Bet365
-    for (const f of state.day.fixtures || []) { const O = FB[String(f.id)] || {}; for (const m of f.markets || []) { const k = [m.stat, m.group, m.side, m.line].join('|'), o = O[k]; if (o) { m.odds = o; m.src = 'fivebet'; } else { m.odds = null; m.estOdds = null; m.src = null; } } } }
+    for (const f of state.day.fixtures || []) { const O = FB[String(f.id)] || {}; for (const m of f.markets || []) { const k = [m.stat, m.group, m.side, m.line].join('|'), o = O[k]; if (o) { m.odds = o; m.src = 'fivebet'; } else { m.odds = null; m.estOdds = null; m.src = null; } }
+      // משחק שנקרא מ-fivebet: ההמלצות הבודדות שלו רק מהימורים שקיימים שם עם יחס אמיתי (הציון הכי גבוה קודם)
+      if (FB[String(f.id)]) { const ok = (f.markets || []).map((m, i) => [m, i]).filter(([m]) => m.odds && m.score >= 6).sort((x, y) => y[0].score - x[0].score || (y[0].ev || 0) - (x[0].ev || 0)); f.picks = (f.picks || []).filter(i => f.markets[i] && f.markets[i].odds); if (!f.picks.length) f.picks = ok.slice(0, 2).map(([, i]) => i); } }
+    if (Array.isArray(state.day.dayPicks)) state.day.dayPicks = state.day.dayPicks.filter(p => { const f = (state.day.fixtures || []).find(x => x.id === p.fid), m = f && f.markets[p.mi]; return !(f && FB[String(f.id)]) || (m && m.odds); }); }
   if (typeof bb !== 'undefined' && bb.idx && bb.idx.days.some(x => x.date === date && x.games) && bb.date !== date) { bb.date = null; }
   const d = state.day;
   $('#updated').textContent = 'עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt });
