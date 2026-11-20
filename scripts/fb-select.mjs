@@ -29,7 +29,7 @@ let CAL = {}; try { CAL = readJson(path.join(ROOT, 'data', 'knowledge', 'calibra
 const calFix = key => { const K = CAL[key.split('|').slice(0, 3).join('|')]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 15))); };
 
 // ---------- התפלגויות ----------
-const PHI = { g: 1.15, c: 1.45, sh: 1.5, sot: 1.4 };
+const PHI = { g: 1.15, c: 1.45, c1: 1.4, sh: 1.5, sot: 1.4 };
 const nb = (m, phi, n = 70) => { const p = []; if (!(m > 0)) return [1]; if (phi <= 1.01) { let v = Math.exp(-m); p.push(v); for (let k = 1; k < n; k++) { v = v * m / k; p.push(v); } return p; }
   const r = m / (phi - 1), q = (phi - 1) / phi; let v = Math.pow(1 - q, r); p.push(v); for (let k = 1; k < n; k++) { v = v * (k - 1 + r) / k * q; p.push(v); } return p; };
 const conv = (a, b) => { const o = Array(a.length + b.length - 1).fill(0); a.forEach((x, i) => b.forEach((y, j) => { o[i + j] += x * y; })); return o; };
@@ -51,12 +51,13 @@ for (const G of games) {
 // ---------- הימורים ----------
 const cands = [];
 const hn = f => clean(f.home.name), an = f => clean(f.away.name);
-const STAT_HE = { g: 'שערים', c: 'קרנות', sh: 'בעיטות', sot: 'בעיטות למסגרת' };
+const STAT_HE = { g: 'שערים', c: 'קרנות', c1: 'קרנות במחצית הראשונה', sh: 'בעיטות', sot: 'בעיטות למסגרת' };
+const fbAll = {};   // כל יחסי fivebet שנקראו (כל השוקים, בלי סינון), לתצוגה באתר
 for (const { G, f } of matched) {
   if (f.ts * 1000 < Date.now() + 10 * 60e3 || !f.exp) continue;
-  const E = f.exp, dist = {}; for (const st of ['g', 'c', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
-  const LGA = Object.fromEntries(["g", "c", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
-  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); 
+  const E = f.exp, dist = {}; for (const st of ['g', 'c', 'c1', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
+  const LGA = Object.fromEntries(["g", "c", "c1", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
+  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); 
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
     cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, note: sf.note, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
   const ahWhy = (name, opp, v, nm) => v > 0 ? `${name} מקבלת יתרון התחלתי של ${v} ${nm}, ולכן ההימור מפסיד רק אם ${opp} מנצחת בהפרש של יותר מ-${v} ${nm}.` : v < 0 ? `${name} צריכה לנצח בהפרש של יותר מ-${-v} ${nm} כדי שההימור יעבור.` : `${name} צריכה לנצח ב${nm} (תיקו = החזר).`;
@@ -75,7 +76,10 @@ for (const { G, f } of matched) {
       add(stat, `${stat}|ah|home|${ln}`, hl(hn(f), ln), o1, pHome, fair2(o1, o2), cat, ahWhy(hn(f), an(f), ln, nm));
       add(stat, `${stat}|ah|away|${-ln}`, hl(an(f), -ln), o2, pAway, fair2(o2, o1), cat, ahWhy(an(f), hn(f), -ln, nm)); }
   };
-  ladders('g', G.main); ladders('c', G.c); ladders('sh', G.sh); ladders('sot', G.sot);
+  ladders('g', G.main); ladders('c', G.c); ladders('c1', G.c1); ladders('sh', G.sh); ladders('sot', G.sot);
+  // תוצאה בקרנות (מי תקבל יותר קרנות): שלוש אפשרויות
+  if (G.cr && dist.c) { const Hc = dist.c.h, Ac = dist.c.a; let ph = 0, pd = 0, pa = 0; Hc.forEach((x, i) => Ac.forEach((y, j) => { if (i > j) ph += x * y; else if (i === j) pd += x * y; else pa += x * y; }));
+    const [r1, rx, r2] = G.cr; add('c', 'c|1x2|home|', `${hn(f)} תקבל יותר קרנות`, r1, ph, 1 / r1 / MARGIN, 'c-res', `לפי הממוצעים שלנו ${hn(f)} צפויה לקבל יותר קרנות מ${an(f)}.`); add('c', 'c|1x2|draw|', 'אותו מספר קרנות לשתי הקבוצות', rx, pd, 1 / rx / MARGIN, 'c-res', 'לפי החישוב שלנו הקרנות ייצאו שוות.'); add('c', 'c|1x2|away|', `${an(f)} תקבל יותר קרנות`, r2, pa, 1 / r2 / MARGIN, 'c-res', `לפי הממוצעים שלנו ${an(f)} צפויה לקבל יותר קרנות מ${hn(f)}.`); }
   // ----- שערים: תוצאה, כפולה, שתיהן כובשות, צירופים -----
   const D = dist.g; if (!D) continue;
   const M = G.main || {}, H = D.h, A = D.a;
@@ -187,7 +191,7 @@ fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.
 // יחסי fivebet האמיתיים לכל הימור (לפי משחק ומפתח הימור): האתר מציג רק אותם, בלי יחס משוער
 { const dir = path.join(ROOT, 'data', 'fbodds'), file = path.join(dir, date + '.json'); fs.mkdirSync(dir, { recursive: true });
   let old = {}; try { old = readJson(file).odds || {}; } catch (e) {}
-  for (const c of cands) { const id = String(c.f.id); (old[id] = old[id] || {})[c.key] = c.odds; }
+  for (const [id, O] of Object.entries(fbAll)) old[id] = { ...(old[id] || {}), ...O };
   fs.writeFileSync(file, JSON.stringify({ updated: new Date().toISOString(), odds: old })); }
 
 console.log(`משחקים מ-fivebet: ${games.length}, הותאמו: ${matched.length}${unmatched.length ? ', לא הותאמו: ' + unmatched.join('; ') : ''}`);

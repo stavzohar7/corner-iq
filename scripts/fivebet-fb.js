@@ -9,15 +9,15 @@ const num = s => parseFloat(String(s).replace(/[^\d.\-+]/g, ''));
 const rowsOf = b => b.split('\n').slice(1).filter(x => x && x.trim() && x !== 'Á');
 // סולמות (סך / סך קבוצה 1,2 / הנדיקאפ), עם קידומת לטאבים (Corners: ...)
 window.__fbLadders = pref => {
-  const D = {}, map = { 'Total': 'tot', 'Total team 1': 't1', 'Total team 2': 't2', 'Handicap': 'hc' };
-  for (const b of window.__blocks()) { let title = b.split('\n')[0].trim(); if (pref) { if (!title.startsWith(pref)) continue; title = title.slice(pref.length).trim(); } else if (/^(Corners|Shots)/.test(title)) continue; if (!(title in map)) continue;
+  const D = {}, map = { 'total': 'tot', 'total team 1': 't1', 'total team 2': 't2', 'handicap': 'hc' };
+  for (const b of window.__blocks()) { let title = b.split('\n')[0].trim(); if (pref) { if (!title.startsWith(pref)) continue; title = title.slice(pref.length).trim(); } else if (/^(Corners|Shots)/.test(title)) continue; title = title.replace(/:$/, '').trim().toLowerCase(); if (!(title in map)) continue;
     const d = D[map[title]] || (D[map[title]] = {}), rows = rowsOf(b);
     for (let k = 0; k + 1 < rows.length; k += 2) { const m = rows[k].match(/^(Over|Under|Handicap 1|Handicap 2)\s*‎?\s*\(([^)]+)\)/); if (m) d[m[1] + '|' + num(m[2])] = num(rows[k + 1]); } }
   const out = {};
   for (const key of Object.keys(D)) { const d = D[key], o = [];
     for (const k of Object.keys(d)) { const ln = +k.split('|')[1];
-      if (key === 'hc') { if (!k.startsWith('Handicap 1|')) continue; const a = d[k], c = d['Handicap 2|' + (-ln)]; if (c != null && ((a >= 1.25 && a <= 3.6) || (c >= 1.25 && c <= 3.6))) o.push([ln, a, c]); }
-      else { if (!k.startsWith('Over|')) continue; const a = d[k], c = d['Under|' + ln]; if (c != null && ((a >= 1.25 && a <= 3.6) || (c >= 1.25 && c <= 3.6))) o.push([ln, a, c]); } }
+      if (key === 'hc') { if (!k.startsWith('Handicap 1|')) continue; const a = d[k], c = d['Handicap 2|' + (-ln)]; if (c != null && ((a >= 1.03 && a <= 12) || (c >= 1.03 && c <= 12))) o.push([ln, a, c]); }
+      else { if (!k.startsWith('Over|')) continue; const a = d[k], c = d['Under|' + ln]; if (c != null && ((a >= 1.03 && a <= 12) || (c >= 1.03 && c <= 12))) o.push([ln, a, c]); } }
     out[key] = o.sort((x, y) => x[0] - y[0]); }
   return out;
 };
@@ -35,7 +35,12 @@ window.__fbMain = () => {
   Object.assign(out, window.__fbLadders(''));
   return out;
 };
-window.__tab = async n => { const els = [...document.querySelectorAll('*')].filter(e => e.children.length === 0 && (e.innerText || '').trim() === n); const el = els.find(e => e.getBoundingClientRect().top < 600) || els[0]; if (el) { el.click(); await sleep(2500); } return !!el; };
+window.__tab = async (n, prefix) => {   // לוחץ על טאב ומחכה עד שהבלוקים שלו (כותרת שמתחילה ב-prefix) מופיעים
+  const find = () => { const els = [...document.querySelectorAll('*')].filter(e => e.children.length === 0 && (e.innerText || '').trim() === n); return els.find(e => e.getBoundingClientRect().top < 600) || els[0]; };
+  let el = find(); for (let w = 0; w < 5 && !el; w++) { await sleep(1000); el = find(); } if (!el) return false;
+  el.click(); if (!prefix) { await sleep(2500); return true; }
+  for (let w = 0; w < 12; w++) { await sleep(900); if (window.__blocks().some(b => b.split('\n')[0].trim().startsWith(prefix))) return true; } return false;
+};
 window.__fbHead = () => { const t = document.body.innerText, i = t.indexOf('\nMain\n'); return t.slice(Math.max(0, i - 260), i).split('\n').map(x => x.trim()).filter(x => x && x.length < 60).slice(-7); };
 // רשימת משחקי הליגה מעמוד הרשימה: [{h, a, date:'DD.MM', time:'H:MM'}] באותו סדר של שורות ה-"+NNNN"
 window.__fbList = () => { const t = document.body.innerText, out = [], re = /\n([^\n]+)\n([^\n]+)\n#\d+\n(\d\d\.\d\d)\n([\d:]+)\n(?:[^\n+][^\n]*\n)?\+\d+/g; let m; while ((m = re.exec(t))) out.push({ h: m[1].trim(), a: m[2].trim(), date: m[3], time: m[4] }); return out; };
@@ -43,9 +48,12 @@ window.__fbList = () => { const t = document.body.innerText, out = [], re = /\n(
 window.__fbGame = async () => {
   const head = window.__fbHead(), slug = (location.href.match(/game=([^&]+)/) || [])[1] || '', gid = (location.href.match(/gameId=(\d+)/) || [])[1] || slug;
   const g = { gid, slug, url: location.pathname + location.search, head, main: window.__fbMain() };
-  if (await window.__tab('Corners')) g.c = window.__fbLadders('Corners:');
-  if (await window.__tab('Shots on target')) g.sot = window.__fbLadders('Shots on target:');
-  if (await window.__tab('Shots')) g.sh = window.__fbLadders('Shots:');
+  if (await window.__tab('Corners', 'Corners:')) {
+    g.c = window.__fbLadders('Corners:'); g.c1 = window.__fbLadders('Corners: 1st Half:');
+    const rb = window.__blocks().find(b => b.split('\n')[0].trim() === 'Corners: Result'); if (rb) { const x = rowsOf(rb).filter(v => /^[\d.]+$/.test(v)).map(Number); if (x.length >= 3) g.cr = x.slice(0, 3); }
+  }
+  if (await window.__tab('Shots on target', 'Shots on target:')) g.sot = window.__fbLadders('Shots on target:');
+  if (await window.__tab('Shots', 'Shots:')) g.sh = window.__fbLadders('Shots:');
   return g;
 };
 // רץ ברקע על כל משחקי הרשימה (העמוד חייב להיות עמוד הליגה). מתקדם משחק אחרי משחק ושומר ב-localStorage.__FB
@@ -75,6 +83,4 @@ window.__fbRun = async dd => {   // dd = 'DD.MM' (רק משחקי התאריך �
 };
 window.__fbStatus = () => JSON.parse(localStorage.__FBS || '{}');
 // ייצוא קצר: בכל סולם משאירים את השורות סביב הקו המאוזן (פחות טקסט להעברה)
-const trim = (arr, w) => { if (!arr || !arr.length) return arr; let best = arr[0]; for (const r of arr) if (Math.abs(r[1] - r[2]) < Math.abs(best[1] - best[2])) best = r; return arr.filter(r => Math.abs(r[0] - best[0]) <= w); };
-const trimL = (L, w) => { if (!L) return L; const o = {}; for (const k of ['tot', 't1', 't2', 'hc']) if (L[k]) o[k] = trim(L[k], w); return o; };
-window.__fbExport = () => { const F = JSON.parse(localStorage.__FB || '{}'); return JSON.stringify(Object.values(F).map(g => ({ gid: g.gid, url: g.url, h: g.h, a: g.a, date: g.date, time: g.time, main: Object.assign({}, g.main, trimL(g.main, 2.6)), c: trimL(g.c, 3.6), sot: trimL(g.sot, 2.6), sh: trimL(g.sh, 6) }))); };
+window.__fbExport = () => { const F = JSON.parse(localStorage.__FB || '{}'); return JSON.stringify(Object.values(F).map(g => ({ gid: g.gid, url: g.url, h: g.h, a: g.a, date: g.date, time: g.time, main: g.main, c: g.c, c1: g.c1, cr: g.cr, sot: g.sot, sh: g.sh }))); };
