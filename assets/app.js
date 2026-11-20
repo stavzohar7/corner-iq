@@ -111,11 +111,21 @@ async function init() {
 }
 async function loadDay(date) {
   state.day = await getJson('data/days/' + date + '.json');
-  { let FB = {}; try { FB = (await getJson('data/fbodds/' + date + '.json')).odds || {}; } catch (e) {}   // רק יחסי fivebet אמיתיים: שום יחס משוער או Bet365
-    for (const f of state.day.fixtures || []) { const O = FB[String(f.id)] || {}; for (const m of f.markets || []) { const k = [m.stat, m.group, m.side, m.line].join('|'), o = O[k]; if (o) { m.odds = o; m.src = 'fivebet'; } else { m.odds = null; m.estOdds = null; m.src = null; } }
-      // משחק שנקרא מ-fivebet: ההמלצות הבודדות שלו רק מהימורים שקיימים שם עם יחס אמיתי (הציון הכי גבוה קודם)
-      if (FB[String(f.id)]) { const ok = (f.markets || []).map((m, i) => [m, i]).filter(([m]) => m.odds && m.score >= 6).sort((x, y) => y[0].score - x[0].score || (y[0].ev || 0) - (x[0].ev || 0)); f.picks = (f.picks || []).filter(i => f.markets[i] && f.markets[i].odds); if (!f.picks.length) f.picks = ok.slice(0, 2).map(([, i]) => i); } }
-    if (Array.isArray(state.day.dayPicks)) state.day.dayPicks = state.day.dayPicks.filter(p => { const f = (state.day.fixtures || []).find(x => x.id === p.fid), m = f && f.markets[p.mi]; return !(f && FB[String(f.id)]) || (m && m.odds); }); }
+  { let FB = null; try { FB = (await getJson('data/fbodds/' + date + '.json')).odds || {}; } catch (e) {}
+    // יום שיש לו יחסי fivebet: מציגים רק הימורים שקיימים ב-fivebet עם יחס אמיתי. הימור בלי שוק שם לא מוצג בכלל (לא יחס משוער ולא Bet365)
+    if (FB) {
+      const idMap = new Map();
+      for (const f of state.day.fixtures || []) {
+        const O = FB[String(f.id)] || {}, oldM = f.markets || [], map = {}, keep = [];
+        oldM.forEach((m, i) => { const o = O[[m.stat, m.group, m.side, m.line].join('|')]; if (o) { m.odds = o; m.src = 'fivebet'; m.estOdds = null; map[i] = keep.length; keep.push(m); } });
+        f.markets = keep; f.picks = (f.picks || []).map(i => map[i]).filter(i => i != null);
+        if (!f.picks.length) f.picks = keep.map((m, i) => [m, i]).filter(([m]) => m.score >= 6).sort((x, y) => y[0].score - x[0].score || (y[0].ev || 0) - (x[0].ev || 0)).slice(0, 2).map(([, i]) => i);
+        if (Array.isArray(f.near)) f.near = [];
+        idMap.set(f.id, map);
+      }
+      if (Array.isArray(state.day.dayPicks)) state.day.dayPicks = state.day.dayPicks.map(p => { const mp = idMap.get(p.fid); return mp && mp[p.mi] != null ? { ...p, mi: mp[p.mi] } : null; }).filter(Boolean);
+    }
+  }
   if (typeof bb !== 'undefined' && bb.idx && bb.idx.days.some(x => x.date === date && x.games) && bb.date !== date) { bb.date = null; }
   const d = state.day;
   $('#updated').textContent = 'עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt });
@@ -319,10 +329,22 @@ document.addEventListener('change', e => {
   if (chk.checked) { const s = parseFloat(st.value) || 0; store.set('ciq-lastStake', String(s)); store.set(k, JSON.stringify({ s })); } else store.set(k, 'null');
   c.classList.toggle('played', chk.checked);
 });
+// כמה הימורים מאותו משחק מוצגים כשורה אחת משולבת (יחס משולב), ולא כל הימור בנפרד
+function slipComboHtml(d, legs, n) {
+  const l0 = legs[0], click = l0.sport === 'f' ? "openMatchOf('" + d.date + "','" + String(l0.id).replace(/'/g, '') + "')" : "openBB('" + d.date + "'," + l0.id + ")";
+  const odds = legs.reduce((x, l) => x * l.odds, 1), res = legs.some(l => l.res === 'lose') ? 'lose' : legs.every(l => l.res === 'win') ? 'win' : legs.every(l => l.res) ? 'push' : '';
+  const mark = l => l.res ? (l.res === 'win' ? '✅ ' : l.res === 'lose' ? '❌ ' : '↩️ ') : '• ';
+  return '<div class="slipLeg slipCombo' + (res ? ' fin-' + res : '') + '" onclick="' + click + '"><span class="rank">' + n + '</span><div class="slipMain"><div class="plabel">🔗 שילוב באותו משחק</div><div class="comboLines">' + legs.map(l => '<div>' + mark(l) + esc(l.label.replace(/\s*\([^)]*[–-][^)]*\)\s*$/, '')) + ' <small class="muted">' + l.odds.toFixed(2) + '</small></div>').join('') + '</div><div class="pmeta">' + SPORT_ICON[l0.sport] + ' ' + esc(l0.game) + ' · ' + fmtTime(l0.ts) + '</div></div><span class="oddsTag">' + odds.toFixed(2) + '</span></div>';
+}
+function slipLegsHtml(d, S, bestLeg) {
+  const groups = [], idx = new Map();
+  for (const l of S.legs) { const k = l.sport + '|' + l.id; if (idx.has(k)) groups[idx.get(k)].push(l); else { idx.set(k, groups.length); groups.push([l]); } }
+  return groups.map((g, i) => g.length > 1 ? slipComboHtml(d, g, i + 1) : slipLegHtml(d, g[0], i + 1, bestLeg === g[0])).join('');
+}
 function slipCardHtml(d, S, title, sub, cls) {
   const prob = S.legs.reduce((a, l) => a * (l.p > 0 ? l.p : 0.6), 1), once = Math.max(2, Math.round(1 / prob)), whys = S.legs.filter(l => l.why), bestLeg = S.legs.some(l => l.p > 0) ? S.legs.reduce((a, l) => (l.p || 0) > (a.p || 0) ? l : a, S.legs[0]) : null;
   const sk = slipKey(d, S), pl = getPlay(sk);
-  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + (pl ? ' played' : '') + '" data-sk="' + esc(sk) + '"><h3>' + title + ' <span class="muted">' + sub + '</span></h3>' + S.legs.map((l, i) => slipLegHtml(d, l, i + 1, bestLeg === l)).join('') +
+  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + (pl ? ' played' : '') + '" data-sk="' + esc(sk) + '"><h3>' + title + ' <span class="muted">' + sub + '</span></h3>' + slipLegsHtml(d, S, bestLeg) +
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
     '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : S.legs.every(l => l.est) ? 'משוער' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div><p class="muted slipFoot">100 ₪ משלמים ' + Math.round(100 * S.total) + ' ₪ · נתפס בערך פעם ב-' + once + ' טפסים' + (S.res === 'win' ? ' · <b class="pos">נתפס ✅</b>' : S.res === 'lose' ? ' · <b class="neg">נפל ❌</b>' : '') + '</p></div>';
 }

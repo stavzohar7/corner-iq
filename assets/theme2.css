@@ -181,3 +181,8 @@ details.banner summary { cursor: pointer; font-weight: 600; list-style: none; } 
 .segN:empty { display: none; }
 .paneHint { margin: 4px 2px 12px; }
 .slipPane[hidden] { display: none; }
+
+/* שילוב כמה הימורים מאותו משחק בשורה אחת */
+.slipCombo { border-inline-start: 4px solid var(--accent); }
+.slipCombo .comboLines { margin: 4px 0 6px; line-height: 1.7; font-weight: 700; }
+.slipCombo .comboLines small { margin-inline-start: 6px; }
