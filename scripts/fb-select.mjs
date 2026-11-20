@@ -184,6 +184,11 @@ for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
   const L = pick3(cands.filter(c => Number(c.f.lg) === lg)); if (L.length !== 3 || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
   const info = LEAGUES.find(l => l.id === lg); spec.fixed.push({ kind: 'league', label: (info ? info.he : 'ליגה ' + lg) + ' · כל משחקי היום', legs: L.map(toLeg) }); }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.stringify(spec, null, 1));
+// יחסי fivebet האמיתיים לכל הימור (לפי משחק ומפתח הימור): האתר מציג רק אותם, בלי יחס משוער
+{ const dir = path.join(ROOT, 'data', 'fbodds'), file = path.join(dir, date + '.json'); fs.mkdirSync(dir, { recursive: true });
+  let old = {}; try { old = readJson(file).odds || {}; } catch (e) {}
+  for (const c of cands) { const id = String(c.f.id); (old[id] = old[id] || {})[c.key] = c.odds; }
+  fs.writeFileSync(file, JSON.stringify({ updated: new Date().toISOString(), odds: old })); }
 
 console.log(`משחקים מ-fivebet: ${games.length}, הותאמו: ${matched.length}${unmatched.length ? ', לא הותאמו: ' + unmatched.join('; ') : ''}`);
 console.log(`הימורים אפשריים: ${cands.length}`);

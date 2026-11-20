@@ -110,7 +110,10 @@ async function init() {
   if (first) { sel.value = first; await loadDay(first); }
 }
 async function loadDay(date) {
-  state.day = await getJson('data/days/' + date + '.json'); if (typeof bb !== 'undefined' && bb.idx && bb.idx.days.some(x => x.date === date && x.games) && bb.date !== date) { bb.date = null; }
+  state.day = await getJson('data/days/' + date + '.json');
+  { let FB = {}; try { FB = (await getJson('data/fbodds/' + date + '.json')).odds || {}; } catch (e) {}   // רק יחסי fivebet אמיתיים: שום יחס משוער או Bet365
+    for (const f of state.day.fixtures || []) { const O = FB[String(f.id)] || {}; for (const m of f.markets || []) { const k = [m.stat, m.group, m.side, m.line].join('|'), o = O[k]; if (o) { m.odds = o; m.src = 'fivebet'; } else { m.odds = null; m.estOdds = null; m.src = null; } } } }
+  if (typeof bb !== 'undefined' && bb.idx && bb.idx.days.some(x => x.date === date && x.games) && bb.date !== date) { bb.date = null; }
   const d = state.day;
   $('#updated').textContent = 'עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt });
   { const ageH = (Date.now() - new Date(d.updated).getTime()) / 3600e3, isToday = date >= ilToday(), stale = isToday && ageH > 3 ? '<div class="banner warnB">⚠️ הנתונים עודכנו לפני ' + (ageH < 24 ? Math.round(ageH) + ' שעות' : Math.round(ageH / 24) + ' ימים') + '. ייתכן שחלק מהתוצאות וההרכבים לא מעודכנים. העדכון האוטומטי רץ כל שעה, ואם הוא נתקע זה יתוקן בהרצה הבאה.</div>' : '';
@@ -156,7 +159,7 @@ function logo(t, side) {
 }
 const teamsRow = f => logo(f.home, 'h') + ' ' + bd(f.home.name) + ' <span class="muted">–</span> ' + bd(f.away.name) + ' ' + logo(f.away, 'a');
 const hits = x => x ? Math.round(x[0] * x[1]) + '/' + x[1] : null;
-const oddsTag = m => m.odds ? '<span class="oddsTag">Bet365 ' + m.odds.toFixed(2) + '</span>' : '<span class="oddsTag est" title="אין יחס Bet365 לקו הזה. זו הערכה לפי ממוצעים"><bdi dir="ltr">משוער ' + (m.estOdds != null ? m.estOdds.toFixed(2) : '—') + '</bdi></span>';
+const oddsTag = m => m.odds && m.src === 'fivebet' ? '<span class="oddsTag">fivebet <bdi dir="ltr">' + m.odds.toFixed(2) + '</bdi></span>' : '<span class="oddsTag est" title="היחסים באתר נלקחים רק מ-fivebet. להימור הזה עוד לא נקרא יחס משם">אין יחס מ-fivebet</span>';
 const conf = c => c >= 0.8 ? 'גבוה' : c >= 0.55 ? 'בינוני' : 'נמוך';
 const ofN = x => x ? Math.round(x[0] * x[1]) + ' מתוך ' + x[1] : null;
 function evidence(m, f) {
