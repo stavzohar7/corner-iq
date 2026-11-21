@@ -186,3 +186,22 @@ details.banner summary { cursor: pointer; font-weight: 600; list-style: none; } 
 .slipCombo { border-inline-start: 4px solid var(--accent); }
 .slipCombo .comboLines { margin: 4px 0 6px; line-height: 1.7; font-weight: 700; }
 .slipCombo .comboLines small { margin-inline-start: 6px; }
+
+/* דגלים, כרטיסיות וקבוצות ליגה */
+.flag { width: 20px; height: 14px; object-fit: cover; border-radius: 3px; vertical-align: -2px; box-shadow: 0 0 0 1px rgba(255,255,255,.18); margin-inline-end: 2px; }
+.slipCard h3 .flag { width: 24px; height: 17px; margin-inline-end: 6px; }
+.segBar { background: var(--surface-1); border: 1px solid var(--line); border-radius: 18px; padding: 6px; gap: 6px; margin: 8px 0 12px; }
+.segBtn { border: 0; background: transparent; border-radius: 13px; padding: 10px 18px; transition: background .15s, color .15s; }
+.segBtn:hover { background: rgba(255,255,255,.06); color: var(--text); }
+.segBtn.on { background: var(--accent); color: #06241a; box-shadow: 0 4px 14px rgba(54, 217, 160, .28); }
+.lgBar { background: var(--surface-1); border: 1px solid var(--line); border-radius: 18px; padding: 8px; }
+.lgBar .chip { border-radius: 12px; gap: 6px; }
+.lgGroup { background: var(--surface-1); border: 1px solid var(--line); border-radius: 18px; margin: 0 0 10px; overflow: hidden; }
+.lgGroup > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; font-weight: 800; font-size: 16px; background: linear-gradient(90deg, rgba(54,217,160,.07), transparent); }
+.lgGroup > summary::-webkit-details-marker { display: none; }
+.lgGroup > summary::after { content: '▾'; color: var(--text-2); margin-inline-start: auto; transition: transform .15s; }
+.lgGroup:not([open]) > summary::after { transform: rotate(90deg); }
+.lgGroup .lgCount { min-width: 26px; text-align: center; padding: 2px 8px; border-radius: 999px; background: var(--accent); color: #06241a; font-size: 13px; font-weight: 900; order: 2; }
+.lgGroup > .srows { padding: 4px 10px 12px; }
+.lgGroup .srow { border-radius: 14px; }
+[data-theme="light"] .segBtn.on, [data-theme="light"] .lgGroup .lgCount { color: #fff; }

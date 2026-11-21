@@ -161,6 +161,10 @@ const openMatch = i => { location.hash = 'match-' + i; };
 window.openMatch = openMatch; window.goTab = goTab;
 const findFx = id => state.day.fixtures.find(x => String(x.id) === String(id));
 const idxOf = id => state.day.fixtures.findIndex(x => String(x.id) === String(id));
+const FLAGS = { 'אנגליה': 'gb-eng', 'ספרד': 'es', 'איטליה': 'it', 'גרמניה': 'de', 'צרפת': 'fr', 'הולנד': 'nl', 'ישראל': 'il', 'פורטוגל': 'pt', 'אירופה': 'eu', 'נבחרות אירופה': 'eu' };
+const flagImg = c => FLAGS[c] ? '<img class="flag" loading="lazy" alt="" src="https://flagcdn.com/w40/' + FLAGS[c] + '.png"> ' : '';
+const lgTag = id => { const l = leagueOf(id); return flagImg(l.country) + esc(l.he); };
+const lgTagByLabel = label => { const ls = (state.day && state.day.leagues || []).filter(l => String(label).startsWith(l.he)).sort((a, b) => b.he.length - a.he.length); return ls[0] ? flagImg(ls[0].country) : ''; };
 const leagueOf = id => state.day.leagues.find(l => l.id === id) || { he: String(id), country: '' };
 
 // ================= רכיבים =================
@@ -344,9 +348,9 @@ function slipLegsHtml(d, S, bestLeg) {
 function slipCardHtml(d, S, title, sub, cls) {
   const prob = S.legs.reduce((a, l) => a * (l.p > 0 ? l.p : 0.6), 1), once = Math.max(2, Math.round(1 / prob)), whys = S.legs.filter(l => l.why), bestLeg = S.legs.some(l => l.p > 0) ? S.legs.reduce((a, l) => (l.p || 0) > (a.p || 0) ? l : a, S.legs[0]) : null;
   const sk = slipKey(d, S), pl = getPlay(sk);
-  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + (pl ? ' played' : '') + '" data-sk="' + esc(sk) + '"><h3>' + title + ' <span class="muted">' + sub + '</span></h3>' + slipLegsHtml(d, S, bestLeg) +
+  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + (pl ? ' played' : '') + '" data-sk="' + esc(sk) + '"><h3>' + (title.startsWith('🏟') ? lgTagByLabel(title.slice(2).trim()) + title.slice(2).trim() : title) + ' <span class="muted">' + sub + '</span></h3>' + slipLegsHtml(d, S, bestLeg) +
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
-    '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : S.legs.every(l => l.est) ? 'משוער' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div><p class="muted slipFoot">100 ₪ משלמים ' + Math.round(100 * S.total) + ' ₪' + (S.res === 'win' ? ' · <b class="pos">נתפס ✅</b>' : S.res === 'lose' ? ' · <b class="neg">נפל ❌</b>' : '') + '</p></div>';
+    '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : S.legs.every(l => l.est) ? 'משוער' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div>' + (S.res ? '<p class="muted slipFoot">' + (S.res === 'win' ? '<b class="pos">נתפס ✅</b>' : S.res === 'lose' ? '<b class="neg">נפל ❌</b>' : '') + '</p>' : '') + '</div>';
 }
 function ciqSlipTab(btn, id) { const box = btn.closest('.slipGroups'); if (!box) return; box.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('on', b === btn)); box.querySelectorAll('.slipPane').forEach(p => { p.hidden = p.dataset.pane !== id; }); }
 window.ciqSlipTab = ciqSlipTab;
@@ -397,18 +401,18 @@ async function fillToday(date) {
   if (sp === 'f') {
     const MP = (d.matchPicks || []).map(p => { const f = findFx(p.fid); return f && f.markets[p.mi] ? { f, m: f.markets[p.mi], i: idxOf(p.fid) } : null; }).filter(Boolean).sort((a, b) => a.f.ts - b.f.ts);
     const lgIds = [...new Set(d.fixtures.map(f => f.lg))], glg = lgIds.includes(Number(state.glg)) ? Number(state.glg) : 'all';
-    const lgBar = lgIds.length > 1 ? '<div class="chips lgBar"><button class="chip' + (glg === 'all' ? ' on' : '') + '" data-glg="all">כל הליגות</button>' + lgIds.map(id => '<button class="chip' + (glg === id ? ' on' : '') + '" data-glg="' + id + '">' + esc(leagueOf(id).he) + '</button>').join('') + '</div>' : '';
+    const lgBar = lgIds.length > 1 ? '<div class="chips lgBar"><button class="chip' + (glg === 'all' ? ' on' : '') + '" data-glg="all">כל הליגות</button>' + lgIds.map(id => '<button class="chip' + (glg === id ? ' on' : '') + '" data-glg="' + id + '">' + lgTag(id) + '</button>').join('') + '</div>' : '';
     if (glg !== 'all') { for (let k = MP.length - 1; k >= 0; k--) if (MP[k].f.lg !== glg) MP.splice(k, 1); }
     const noMk = d.fixtures.filter(f => !MP.some(x => x.f === f) && (glg === 'all' || f.lg === glg)).sort((a, b) => a.ts - b.ts);
     if (MP.length || noMk.length) {
       const gw = MP.filter(x => x.m.res && x.m.res.includes('win')).length, gl = MP.filter(x => x.m.res && x.m.res.includes('lose')).length;
-      html += '<h3 class="secTitle">🗂 כל משחקי היום: ההמלצה הטובה ביותר לכל משחק' + (gw + gl ? ' <span class="muted">· נתפסו ' + gw + ' · נפלו ' + gl + '</span>' : '') + '</h3><p class="srcNote">לכל משחק בליגות שלנו יש כאן המלצה אחת, גם אם היא לא נכנסה לטפסים. ציון 6 ומעלה = המלצה טובה, מתחת ל-6 = חלשה, לעיון בלבד. לחיצה פותחת את המשחק.</p>' + lgBar + '<div class="srows">' + MP.map(x => singleRow(x.f, x.m, x.i)).join('') + noMk.map(f => '<div class="srow" onclick="openMatch(' + idxOf(f.id) + ')"><span class="score s-lo">–</span><div class="smain"><div class="plabel">אין עדיין המלצה</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div><div class="muted">חסרים נתונים או יחסים. מתעדכן אוטומטית כל שעה.</div></div></div>').join('') + '</div>';
+      html += '<h3 class="secTitle">🗂 כל משחקי היום: ההמלצה הטובה ביותר לכל משחק' + (gw + gl ? ' <span class="muted">· נתפסו ' + gw + ' · נפלו ' + gl + '</span>' : '') + '</h3><p class="srcNote">לכל משחק בליגות שלנו יש כאן המלצה אחת, גם אם היא לא נכנסה לטפסים. ציון 6 ומעלה = המלצה טובה, מתחת ל-6 = חלשה, לעיון בלבד. לחיצה פותחת את המשחק.</p>' + lgBar + groupByLg(MP, glg !== 'all') + '<div class="srows">' + noMk.map(f => '<div class="srow" onclick="openMatch(' + idxOf(f.id) + ')"><span class="score s-lo">–</span><div class="smain"><div class="plabel">אין עדיין המלצה</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div><div class="muted">חסרים נתונים או יחסים. מתעדכן אוטומטית כל שעה.</div></div></div>').join('') + '</div>';
     }
   }
   const L = singles[sp], LIM = state.allPicks === sp ? 999 : 8, isW = r => r && r.includes('win'), isL = r => r && r.includes('lose');
   const w = L.filter(x => isW(x.m.res)).length, l = L.filter(x => isL(x.m.res)).length;
   html += '<h3 class="secTitle">🎯 המלצות בודדות · ' + spName + (w + l ? ' <span class="muted">· נתפסו ' + w + ' · נפלו ' + l + '</span>' : '') + '</h3><p class="srcNote">כל המלצה כאן עומדת לבד ואינה חלק מטופס. היחסים כאן של Bet365, לעיון.</p>';
-  html += L.length ? '<div class="srows">' + L.slice(0, LIM).map(x => sp === 'f' ? singleRow(x.f, x.m, x.i) : bbSingleRow(date, x.g, x.m)).join('') + '</div>' + (L.length > LIM ? '<div class="more"><button class="btn" id="showAllPicks">הצג את כל ' + L.length + ' ההמלצות</button></div>' : '') : '<div class="empty">אין היום המלצות בודדות ' + SP_IN[sp] + ' שעוברות את הרף.</div>';
+  html += L.length ? (sp === 'f' ? groupByLg(L, 'first') : '<div class="srows">' + L.slice(0, LIM).map(x => bbSingleRow(date, x.g, x.m)).join('') + '</div>' + (L.length > LIM ? '<div class="more"><button class="btn" id="showAllPicks">הצג את כל ' + L.length + ' ההמלצות</button></div>' : '')) : '<div class="empty">אין היום המלצות בודדות ' + SP_IN[sp] + ' שעוברות את הרף.</div>';
   box.innerHTML = html;
   box.querySelectorAll('[data-glg]').forEach(b => b.onclick = () => { state.glg = b.dataset.glg; fillToday(date); });
   box.querySelectorAll('[data-slipsp]').forEach(b => b.onclick = () => { state.slipSp = b.dataset.slipsp; fillToday(date); });
@@ -443,8 +447,13 @@ async function fillSlipHist() {
   html += '<div class="card"><h4>📋 כל הטפסים בפירוט</h4><div class="tblWrap"><table><thead><tr><th>יום</th><th>טופס</th><th>ההימורים</th><th class="num">יחס כולל</th><th class="num">מצב</th><th class="num">מאזן</th></tr></thead><tbody>' + rows.map(({ d, name, S }) => '<tr><td>' + fmtShort(d.date) + '</td><td>' + name + '</td><td>' + S.legs.map(l => (l.res === 'win' ? '✅ ' : l.res === 'lose' ? '❌ ' : l.res === 'push' ? '↩ ' : '') + esc(l.label) + (l.act ? ' <span class="muted">(' + esc(l.act) + ')</span>' : '')).join('<br>') + '</td><td class="num">' + S.total.toFixed(2) + '</td><td class="num">' + (S.res ? '<span class="res ' + S.res + '">' + (S.res === 'win' ? 'נתפס ✅' : 'נפל ❌') + '</span>' : '⏳') + '</td><td class="num"><b class="' + moneyCls(slipMoney(S)) + '">' + (S.res ? fmtMoney(slipMoney(S)) : '—') + '</b></td></tr>').join('') + '</tbody></table></div></div>';
   box.innerHTML = myHtml + html;
 }
-function singleRow(f, m, i) {
-  return '<div class="srow' + (m.res ? ' fin-' + RES[m.res][1] : '') + '" onclick="openMatch(' + i + ')"><span class="score ' + scoreCls(m.score) + '" title="דירוג ' + m.score + ' מתוך 10">' + m.score + '</span><div class="smain"><div class="plabel">' + mIcon(m) + ' ' + esc(m.label) + '</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div>' + (m.res ? resStrip(f, m) : '') + '</div><div class="sside">' + oddsTag(m) + '</div></div>';
+function groupByLg(rows, open) {
+  const by = new Map(); for (const x of rows) (by.get(x.f.lg) || by.set(x.f.lg, []).get(x.f.lg)).push(x);
+  const gs = [...by.entries()].map(([lg, L]) => ({ lg, L: L.sort((a, b) => a.f.ts - b.f.ts) })).sort((a, b) => a.L[0].f.ts - b.L[0].f.ts);
+  return gs.map((g, k) => '<details class="lgGroup"' + (open === true || (open === 'first' && k === 0) ? ' open' : '') + '><summary><span class="lgName">' + lgTag(g.lg) + '</span><span class="lgCount">' + g.L.length + '</span></summary><div class="srows">' + g.L.map(x => singleRow(x.f, x.m, x.i, true)).join('') + '</div></details>').join('');
+}
+function singleRow(f, m, i, noLg) {
+  return '<div class="srow' + (m.res ? ' fin-' + RES[m.res][1] : '') + '" onclick="openMatch(' + i + ')"><span class="score ' + scoreCls(m.score) + '" title="דירוג ' + m.score + ' מתוך 10">' + m.score + '</span><div class="smain"><div class="plabel">' + mIcon(m) + ' ' + esc(m.label) + '</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + (noLg ? '' : ' · ' + lgTag(f.lg)) + ' · ' + fmtTime(f.ts) + '</div>' + (m.res ? resStrip(f, m) : '') + '</div><div class="sside">' + oddsTag(m) + '</div></div>';
 }
 function renderToday() {
   const el = $('#view-today'), d = state.day;
