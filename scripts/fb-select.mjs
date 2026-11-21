@@ -239,7 +239,7 @@ fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.
   let oldRecs = []; try { oldRecs = readJson(file).recs || []; } catch (e) {}
   const startedIds = new Set(matched.filter(m => m.f.ts * 1000 <= Date.now()).map(m => String(m.f.id))), freshIds = new Set(cands.map(gid));
   const seenR = new Set(), recs = cands.filter(c => c.pb >= 0.6 && c.odds >= 1.4 && c.pb * c.odds - 1 >= EV_MIN).sort((x, y) => y.pb - x.pb).filter(c => { const k = gid(c) + '|' + c.key; if (seenR.has(k)) return false; seenR.add(k); return true; })
-    .filter((c, i, arr) => arr.slice(0, i).filter(y => gid(y) === gid(c)).length < 2).map(c => ({ id: c.f.id, key: c.key, label: c.label, odds: c.odds, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), sc: c.pb >= 0.64 ? 7 : 6 }));
+    .filter((c, i, arr) => arr.slice(0, i).filter(y => gid(y) === gid(c)).length < 2).map(c => ({ id: c.f.id, key: c.key, label: c.label, odds: c.odds, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), sc: c.pb >= 0.64 ? 7 : 6, why: whyOf(c) }));
   { let up = 0; for (let i = 0; i < recs.length; i++) { if (startedIds.has(String(recs[i].id))) continue; if (++up > 60) { recs.splice(i, 1); i--; } } }
   // המלצות של משחקים שכבר התחילו או נגמרו נשארות כמו שהיו, לא נמחקות
   for (const r of oldRecs) if (!freshIds.has(String(r.id)) || startedIds.has(String(r.id))) { const k = r.id + '|' + r.key; if (!seenR.has(k)) { seenR.add(k); recs.push(r); } }

@@ -443,7 +443,7 @@ async function fillToday(date) {
       [...by.entries()].sort((a, b) => Math.min(...a[1].map(x => x.f.ts)) - Math.min(...b[1].map(x => x.f.ts))).map(([lg, L], k) => '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(lg) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="srows">' + L.sort((a, b) => b.r.p - a.r.p).map(x => (() => { const mk = (x.f.markets || []).find(m => [m.stat, m.group, m.side, m.line].join('|') === x.r.key), rs = mk && mk.res ? RES[mk.res] : null; x.rs = rs; return ''; })() + '<div class="srow' + (x.rs ? ' fin-' + x.rs[1] : '') + '" onclick="openMatch(' + idxOf(x.f.id) + ')"><span class="score ' + scoreCls(x.r.sc) + '">' + x.r.sc + '</span><div class="smain"><div class="plabel">' + (x.rs ? x.rs[0].split(' ')[1] + ' ' : '') + (cat ? '' : ((BET_CATS.find(c => c[0] === catOfKey(x.r.key)) || [])[1] || '') + ' ') + esc(x.r.label) + '</div><div class="pmeta">' + bd(x.f.home.name) + ' – ' + bd(x.f.away.name) + ' · ' + fmtTime(x.f.ts) + '</div></div><div class="sside"><span class="oddsTag">fivebet <bdi dir="ltr">' + x.r.odds.toFixed(2) + '</bdi></span></div></div>').join('') + '</div></details>').join(''); };
   html += '<div class="statBar"><button class="chip' + (wantDone ? '' : ' on') + '" data-tstat="live">⏳ רלוונטיים</button><button class="chip' + (wantDone ? ' on' : '') + '" data-tstat="done">✅ נגמרו</button></div>';
   if (sp === 'f') {
-    const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 כל המשחקים', 'ההמלצה הטובה ביותר לכל משחק', pGames || '<div class="empty">אין משחקים להצגה.</div>', '']];
+    const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 כל המשחקים', 'כל משחקי היום לפי ליגה ושעה, כמו באפליקציית תוצאות. לחיצה על משחק פותחת ניתוח מלא.', gamesPaneHtml(cat), state.day.fixtures.length]];
     html += slipsHtml(s, sp, cat, wantDone, extras) || '<div class="empty">אין כאן עדיין כלום.</div>';
   } else html += state.tmode === 'slips' ? pSlips : pSing;
   box.innerHTML = html;
@@ -623,6 +623,33 @@ function stakesCard(f) {
   const tn = c.tension === 'high' ? 'שתי הקבוצות עם הרבה על הכף: משחק רציני משני הצדדים.' : c.tension === 'low' ? 'לשתי הקבוצות אין הרבה על הכף: סיכוי לרוטציה ולמשחק פחות לוחץ.' : '';
   return '<div class="card"><h4>🎯 מה על הכף ואיך הן מגיעות</h4><ul class="notes">' + rows.join('') + '</ul>' + (tn ? '<p class="muted" style="margin:6px 0 0">' + tn + '</p>' : '') + '</div>';
 }
+const cleanTxt = t => String(t || '').replace(/[^.]*יחס משוער[^.]*\.\s*/g, '').trim();
+const LG_ORDER = [2, 3, 848, 39, 140, 135, 78, 61, 88, 94, 40, 79, 45, 48, 137, 143, 81, 384, 5];
+function gamesPaneHtml(cat) {
+  const fx = [...(state.day.fixtures || [])], recs = (state.recs || []).filter(r => r.odds >= 1.4 && (!cat || catOfKey(r.key) === cat));
+  const rOf = f => recs.filter(r => String(r.id) === String(f.id)).sort((a, b) => b.p - a.p);
+  const glg = Number(state.glg) || 'all', ord = id => LG_ORDER.indexOf(id) < 0 ? 99 : LG_ORDER.indexOf(id), lgIds = [...new Set(fx.map(f => f.lg))].sort((a, b) => ord(a) - ord(b));
+  const lgBar = lgIds.length > 1 ? '<div class="chips lgBar"><button class="chip' + (glg === 'all' ? ' on' : '') + '" data-glg="all">כל הליגות</button>' + lgIds.map(id => '<button class="chip' + (glg === id ? ' on' : '') + '" data-glg="' + id + '">' + lgTag(id) + '</button>').join('') + '</div>' : '';
+  let out = lgBar;
+  for (const id of lgIds) {
+    if (glg !== 'all' && glg !== id) continue;
+    const L = fx.filter(f => f.lg === id).sort((a, b) => a.ts - b.ts).filter(f => !cat || rOf(f).length);
+    if (!L.length) continue;
+    out += '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(id) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="gmList">' +
+      L.map(f => { const st = statusOfFx(f), R = rOf(f).slice(0, 2);
+        const mid = f.result ? '<b class="gmScore">' + f.result.g[0] + ' : ' + f.result.g[1] + '</b><small>נגמר</small>' : st === 'live' ? '<b class="gmLive">⏳</b><small>בתהליך</small>' : '<span class="gmDash">–</span>';
+        return '<div class="gm" onclick="openMatch(' + idxOf(f.id) + ')"><span class="gmT">' + fmtTime(f.ts) + '</span><div class="gmTeams"><div>' + logo(f.home, 'h') + ' ' + bd(f.home.name) + '</div><div>' + logo(f.away, 'a') + ' ' + bd(f.away.name) + '</div></div><div class="gmMid">' + mid + '</div>' +
+          '<div class="gmPicks">' + (R.length ? R.map(r => '<span class="gmPick' + (r.sc >= 7 ? ' hi' : '') + '">' + esc(r.label) + ' <bdi dir="ltr">' + r.odds.toFixed(2) + '</bdi></span>').join('') : '<span class="muted gmNone">אין המלצה חזקה</span>') + '</div><span class="gmGo">›</span></div>'; }).join('') + '</div></details>';
+  }
+  return out || '<div class="empty">אין משחקים להצגה.</div>';
+}
+function ourBetsCard(f) {
+  const R = (state.recs || []).filter(r => String(r.id) === String(f.id) && r.odds >= 1.4).sort((a, b) => b.p - a.p);
+  if (!R.length) return '';
+  const mk = r => (f.markets || []).find(m => [m.stat, m.group, m.side, m.line].join('|') === r.key), cl = x => String(x || '').replace(/[⁦-⁩]/g, '');
+  return '<div class="card ourBets"><h4>🎯 ההימורים שלנו במשחק</h4>' + R.map(r => { const m = mk(r), rs = m && m.res ? RES[m.res] : null;
+    return '<div class="ob' + (rs ? ' fin-' + rs[1] : '') + '"><div class="obTop"><span class="score ' + scoreCls(r.sc) + '">' + r.sc + '</span><b class="obLbl">' + (rs ? rs[0].split(' ')[1] + ' ' : '') + esc(r.label) + '</b><span class="oddsTag">fivebet <bdi dir="ltr">' + r.odds.toFixed(2) + '</bdi></span></div>' + (r.why ? '<p class="obWhy">' + esc(cl(r.why)) + '</p>' : '') + '</div>'; }).join('') + '</div>';
+}
 function renderMatch(i) {
   const f = state.day.fixtures[i], lg = leagueOf(f.lg), ch = f.character || {};
   let html = '<div class="mbar"><button class="btn" onclick="goTab(state.tab)">← חזרה</button><span class="muted">' + esc(lg.he) + (heRound(f.round) ? ' · ' + heRound(f.round) : '') + '</span></div>' +
@@ -643,9 +670,10 @@ function renderMatch(i) {
       html += '<div class="card"><h4>📊 מה השוק (Bet365) מצפה</h4>' + rows.join('') + '<p class="muted" style="margin:8px 0 0">זו ההערכה של Bet365, לא שלנו.</p></div>'; }
     $('#view-match').innerHTML = html; return;
   }
+  html += ourBetsCard(f);
   const picks = f.picks.map(k => f.markets[k]), exStart = html.length;
-  if (f.expert) html += '<div class="card expertCard"><h4>🧠 הדעה שלנו על המשחק' + (f.expert.head ? ' — ' + esc(f.expert.head) : '') + '</h4>' + f.expert.take.map(p => '<p>' + esc(p) + '</p>').join('') + '<p class="muted" style="margin:8px 0 0;font-size:12px">נכתב אחרי קריאה של כל משחקי העונה של שתי הקבוצות: בית וחוץ, מול גדולות וקטנות ומול קבוצות שמתבצרות.</p></div>';
-  html += f.story && f.story.length ? '<div class="card storyCard"><h4>📖 איך המשחק הזה נראה</h4>' + f.story.map(p => '<p>' + esc(p) + '</p>').join('') + '</div>' + (!f.expert && f.opinion && f.opinion.length ? '<div class="card opinionCard"><h4>🧠 המחשבה שלנו</h4>' + f.opinion.map(p => '<p>' + esc(p) + '</p>').join('') + '</div>' : '') : '<div class="card"><h4>🔎 מי נגד מי</h4><ul class="notes"><li>' + matchupLine(f, 'h') + '</li><li>' + matchupLine(f, 'a') + '</li></ul></div>';
+  if (f.expert) html += '<div class="card expertCard"><h4>🧠 הדעה שלנו על המשחק' + (f.expert.head ? ' — ' + esc(f.expert.head) : '') + '</h4>' + f.expert.take.map(p => cleanTxt(p)).filter(Boolean).map(p => '<p>' + esc(p) + '</p>').join('') + '<p class="muted" style="margin:8px 0 0;font-size:12px">נכתב אחרי קריאה של כל משחקי העונה של שתי הקבוצות: בית וחוץ, מול גדולות וקטנות ומול קבוצות שמתבצרות.</p></div>';
+  html += f.story && f.story.length ? '<div class="card storyCard"><h4>📖 איך המשחק הזה נראה</h4>' + f.story.map(p => cleanTxt(p)).filter(Boolean).map(p => '<p>' + esc(p) + '</p>').join('') + '</div>' + (!f.expert && f.opinion && f.opinion.length ? '<div class="card opinionCard"><h4>🧠 המחשבה שלנו</h4>' + f.opinion.map(p => cleanTxt(p)).filter(Boolean).map(p => '<p>' + esc(p) + '</p>').join('') + '</div>' : '') : '<div class="card"><h4>🔎 מי נגד מי</h4><ul class="notes"><li>' + matchupLine(f, 'h') + '</li><li>' + matchupLine(f, 'a') + '</li></ul></div>';
   const exEnd = html.length;
   html += '<div class="card"><h4>⭐ ההמלצות למשחק</h4>' + (picks.length ? '<div class="recs">' + picks.map(m => recRow(m, f)).join('') + '</div>' : '<p class="muted" style="margin:0">אין המלצה חזקה במשחק הזה.</p>') + '</div>';
   html = html.slice(0, exStart) + html.slice(exEnd) + html.slice(exStart, exEnd);   // ההמלצות קודם, ואחריהן הדעה והסיפור

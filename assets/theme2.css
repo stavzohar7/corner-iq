@@ -241,3 +241,20 @@ details.banner summary { cursor: pointer; font-weight: 600; list-style: none; } 
 .dayHint { display: none; }
 
 .statBar { display: flex; gap: 8px; margin: 0 0 12px; } .statBar .chip { flex: 0 0 auto; }
+
+/* כל המשחקים בסגנון אפליקציית תוצאות */
+.gmList { padding: 2px 8px 10px; }
+.gm { display: grid; grid-template-columns: 52px minmax(0, 1.3fr) 58px minmax(0, 1.5fr) 18px; gap: 10px; align-items: center; padding: 11px 8px; border-top: 1px solid var(--line); cursor: pointer; }
+.gm:first-child { border-top: 0; } .gm:hover { background: rgba(255,255,255,.04); border-radius: 12px; }
+.gmT { font-weight: 800; color: var(--text-2); font-size: 14px; text-align: center; }
+.gmTeams { display: grid; gap: 3px; font-weight: 700; font-size: 14.5px; min-width: 0; } .gmTeams > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gmMid { display: grid; text-align: center; line-height: 1.2; } .gmMid small { color: var(--text-2); font-size: 11px; } .gmScore { font-size: 17px; } .gmDash, .gmLive { color: var(--text-2); font-size: 16px; }
+.gmPicks { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.gmPick { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 700; }
+.gmPick.hi { border-color: var(--accent-line, var(--accent)); background: rgba(54,217,160,.1); }
+.gmNone { font-size: 12.5px; } .gmGo { color: var(--text-2); font-size: 22px; }
+@media (max-width: 760px) { .gm { grid-template-columns: 44px minmax(0, 1fr) 48px 14px; } .gmPicks { grid-column: 2 / 4; } .gmT { font-size: 13px; } }
+.ourBets .ob { padding: 10px 0; border-top: 1px solid var(--line); } .ourBets .ob:first-of-type { border-top: 0; }
+.ourBets .obTop { display: flex; align-items: center; gap: 10px; } .ourBets .obLbl { flex: 1; font-size: 16px; }
+.ourBets .obWhy { margin: 6px 0 0; color: var(--text-2); font-size: 14px; line-height: 1.6; }
+.ourBets .ob.fin-win .obLbl { color: var(--good); } .ourBets .ob.fin-lose .obLbl { color: var(--bad); }
