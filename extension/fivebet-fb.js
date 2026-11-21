@@ -59,6 +59,9 @@ window.__fbGame = async () => {
 // רץ ברקע על כל משחקי הרשימה (העמוד חייב להיות עמוד הליגה). מתקדם משחק אחרי משחק ושומר ב-localStorage.__FB
 window.__fbRun = async dd => {   // dd = 'DD.MM' (רק משחקי התאריך הזה), או בלי פרמטר לכל הרשימה
   const list = window.__fbList(), idx = window.__rowSel().map((_, k) => k).filter(k => !dd || (list[k] && list[k].date === dd)), meta = {};
+  const listUrl = location.pathname + location.search, kk = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const listOk = () => { const l = window.__fbList(); return l.length === list.length && l[0] && list[0] && l[0].h === list[0].h; };
+  const toList = async () => { history.back(); await sleep(3500); if (!listOk()) { history.pushState({}, '', listUrl); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); for (let w = 0; w < 12 && !listOk(); w++) await sleep(1000); } };   // חוזרים לרשימת הליגה (גם אם history.back הוביל לעמוד אחר)
   window.__lastSig = null; const st = { done: 0, total: idx.length, err: [], running: true }; localStorage.__FBS = JSON.stringify(st); localStorage.__FB = '{}';
   (async () => {
     for (let n = 0; n < st.total; n++) {
@@ -67,13 +70,14 @@ window.__fbRun = async dd => {   // dd = 'DD.MM' (רק משחקי התאריך �
         let rows = window.__rowSel(); for (let w = 0; w < 20 && !rows.length; w++) { await sleep(1000); rows = window.__rowSel(); }
         if (!rows[k]) { st.err.push([k, 'norow']); continue; }
         rows[k].click(); for (let w = 0; w < 25; w++) { await sleep(1000); if (location.href.includes('GameDetails') && window.__blocks().length > 50) break; }
+        { const slug = kk((location.href.match(/game=([^&]+)/) || [])[1]); if (!list[k] || !slug.includes(kk(list[k].h).slice(0, 6))) { st.err.push([k, 'wrong-game']); await toList(); st.done = n + 1; localStorage.__FBS = JSON.stringify(st); continue; } }   // העמוד שנפתח חייב להיות המשחק שביקשנו
         await sleep(2500);   // נותנים לעמוד להתחלף (העמוד הקודם עלול להישאר רגע על המסך)
         let g = await window.__fbGame(); const sig = x => JSON.stringify(x.main && x.main.r), prev = window.__lastSig;
         for (let w = 0; w < 3 && prev && sig(g) === prev; w++) { await sleep(6000); g = await window.__fbGame(); }   // אותם יחסי תוצאה כמו המשחק הקודם = נקרא עמוד ישן, קוראים שוב
-        if (prev && sig(g) === prev) { st.err.push([k, 'stale']); history.back(); await sleep(3500); if (!window.__rowSel().length) { history.back(); await sleep(3000); } st.done = n + 1; localStorage.__FBS = JSON.stringify(st); continue; }
+        if (prev && sig(g) === prev) { st.err.push([k, 'stale']); await toList(); st.done = n + 1; localStorage.__FBS = JSON.stringify(st); continue; }
         window.__lastSig = sig(g);
         g.h = list[k] && list[k].h; g.a = list[k] && list[k].a; g.date = list[k] && list[k].date; g.time = list[k] && list[k].time; const F = JSON.parse(localStorage.__FB || '{}'); F[g.gid] = g; localStorage.__FB = JSON.stringify(F);
-        history.back(); await sleep(3500); if (!window.__rowSel().length) { history.back(); await sleep(3000); }
+        await toList();
       } catch (e) { st.err.push([k, String(e)]); }
       st.done = n + 1; localStorage.__FBS = JSON.stringify(st);
     }
