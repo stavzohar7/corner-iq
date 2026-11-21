@@ -126,6 +126,7 @@ function whyOf(c) {
 }
 const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: whyOf(c) });
 const total = L => Math.round(L.reduce((p, c) => p * c.odds, 1) * 100) / 100;
+console.log('FX', [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].sort((a, b) => a.ts - b.ts).map(f => hhmm(ilMin(f.ts)) + ' ' + f.home.name + '–' + f.away.name).join(' | '));
 const spec = { date, strong: {}, second: {}, win: [], fixed: [] }, seen = new Set(), sigOf = L => L.map(legSig).sort().join(',');
 // טפסים חזקים: 3 משחקים. בכל משחק נבחר ההימור החזק ביותר, מכל סוג (תוצאה, שערים, קרנות, בעיטות, צירופים).
 // הימור שני באותו משחק נוסף רק אם הוא גם חזק (רף גבוה יותר), מסוג שונה (לא שני הימורי תוצאה, ולא שני הימורים על אותו מדד), לא סותר את הראשון, ושניהם יחד עדיין סבירים.
@@ -172,10 +173,12 @@ function pickGames(pool, avoidGames = new Set(), nGames = 3) {
 }
 
 // טופס עם יחס כולל 3.5 לפחות (יעד 4-5): לכל משחק אפשרות של הימור בודד או זוג, ובוחרים את השילוב החזק ביותר שמגיע לטווח
+const EV_MIN = 0.04, sideOf = c => c.key.split('|')[2];
+const redundant = (x, y) => x.stat === y.stat && x.stat !== 'g' && sideOf(x) === sideOf(y) || (x.stat === 'g' && y.stat === 'g' && famKey(x) === famKey(y)) || (x.stat === 'g' && grpOf(x) === 'total' && grpOf(y) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && grpOf(y) === 'total' && grpOf(x) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && ['home','away'].includes(grpOf(x)) && grpOf(y) === 'total' && sideOf(x) === sideOf(y));
 const BAND_MIN = 3.5, BAND_MAX = 5.3, BAND_MID = 4.4;
 function gameOptions(pool, min) {
   const byGame = new Map();
-  for (const c of pool.filter(c => c.pb >= min)) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
+  for (const c of pool.filter(c => c.pb >= min && c.pb * c.odds - 1 >= EV_MIN)) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
   const res = [];
   for (const L of byGame.values()) {
     L.sort((x, y) => y.rank - x.rank);
@@ -183,7 +186,7 @@ function gameOptions(pool, min) {
     if (single) ch.push({ sc: single.pb, legs: [single], o: single.odds });
     let pair = null;
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j];
-      if (x.key === y.key || famKey(x) === famKey(y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue;
+      if (x.key === y.key || famKey(x) === famKey(y) || redundant(x, y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue;
       const p = pairProb(x, y); if (p < PAIR_JOINT_MIN) continue; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
     if (pair) ch.push({ sc: Math.max(pair.legs[0].pb, pair.legs[1].pb) + 0.04, legs: pair.legs, o: pair.legs[0].odds * pair.legs[1].odds });
     if (ch.length) res.push({ best: Math.max(...ch.map(c => c.sc)), ch });
@@ -212,8 +215,11 @@ let second = bandPick(cands, strongGames);
 if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second)); }
 // טפסי שעות: צברים של עד שעה וחצי בין תחילות המשחקים
 { const fx = [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].filter(f => f.ts * 1000 > Date.now()).sort((a, b) => a.ts - b.ts);
-  for (let i = 0; i < fx.length;) { const start = fx[i].ts, ids = new Set(), times = []; while (i < fx.length && fx[i].ts - start <= 90 * 60) { ids.add(String(fx[i].id)); times.push(ilMin(fx[i].ts)); i++; }
-    const L = bandPick(cands.filter(c => ids.has(gid(c)))); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
+  const starts = [...new Set(fx.map(f => f.ts))], done = [];
+  for (const st of starts) { const grp = fx.filter(f => f.ts >= st && f.ts - st <= 60 * 60), ids = new Set(grp.map(f => String(f.id))), times = grp.map(f => ilMin(f.ts));
+    if (ids.size < 2 || done.some(d => d.size === ids.size && [...ids].every(x => d.has(x)))) continue;
+    const pool = cands.filter(c => ids.has(gid(c))); let L = bandPick(pool); if (!L.length) continue; done.push(ids);
+    if (seen.has(sigOf(L))) { L = bandPick(pool, new Set(L.map(gid))); if (!L.length || seen.has(sigOf(L))) continue; } seen.add(sigOf(L));
     const a = Math.min(...times), b = Math.max(...times); spec.win.push({ label: a === b ? 'משחקי ' + hhmm(a) : 'משחקי ' + hhmm(a) + '–' + hhmm(b), legs: L.map(toLeg) }); } }
 // טפסים קבועים: בונדסליגה שבת 16:30, פרמייר ליג שבת 17:00
 for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' }, { lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' }]) {
