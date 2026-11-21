@@ -93,7 +93,8 @@ const bySport = c => c.game.comp === 103 ? 'n' : 'e';
 const spec = { date, strong: {}, second: {} };
 // טפסים חזקים: עד 3 משחקים. הימור שני באותו משחק רק אם הוא חזק (רף גבוה), מסוג שונה ולא סותר, ושני ההימורים יחד ביחס 1.8 לפחות.
 const PAIR_MIN = 0.62, kindOf = c => c.key.split('|')[0];
-const okPair = (x, y) => { const k = [kindOf(x), kindOf(y)].sort().join('+'); return k === 'spread+total' || k === 'spread+th' || k === 'ml+total' || k === 'ml+th'; };
+// ב-fivebet אפשר לשלב ב-Bet Builder כל שני שווקים מאותו משחק. כאן: כל שני סוגים שונים, חוץ מכפילות (ניצחון+הנדיקאפ) וסתירה (סך נקודות מתחת עם קבוצה מעל, או להפך)
+const sideOf2 = c => c.key.split('|')[1], okPair = (x, y) => { const kx = kindOf(x), ky = kindOf(y); if (kx === ky) return false; const ks = [kx, ky].sort().join('+'); if (ks === 'ml+spread') return false; if (ks === 'th+total' || ks === 'ta+total' || ks === 'spread+th' && false) { const t = kx === 'total' ? x : y, o = kx === 'total' ? y : x; if (sideOf2(t) !== sideOf2(o)) return false; } return true; };
 function pickBB(T, exclGames) {
   const byGame = new Map(); for (const c of T) { if (exclGames.has(c.game.id)) continue; (byGame.get(c.game.id) || byGame.set(c.game.id, []).get(c.game.id)).push(c); }
   const opts = [];
