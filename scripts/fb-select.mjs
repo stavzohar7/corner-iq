@@ -170,22 +170,57 @@ function pickGames(pool, avoidGames = new Set(), nGames = 3) {
   }
   return [];
 }
-let strong = pickGames(cands); if (strong.length < 3) strong = pick3(cands);
+
+// טופס עם יחס כולל 3.5 לפחות (יעד 4-5): לכל משחק אפשרות של הימור בודד או זוג, ובוחרים את השילוב החזק ביותר שמגיע לטווח
+const BAND_MIN = 3.5, BAND_MAX = 5.3, BAND_MID = 4.4;
+function gameOptions(pool, min) {
+  const byGame = new Map();
+  for (const c of pool.filter(c => c.pb >= min)) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
+  const res = [];
+  for (const L of byGame.values()) {
+    L.sort((x, y) => y.rank - x.rank);
+    const ch = []; const single = L.find(c => c.odds >= 1.4);
+    if (single) ch.push({ sc: single.pb, legs: [single], o: single.odds });
+    let pair = null;
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j];
+      if (x.key === y.key || famKey(x) === famKey(y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue;
+      const p = pairProb(x, y); if (p < PAIR_JOINT_MIN) continue; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
+    if (pair) ch.push({ sc: Math.max(pair.legs[0].pb, pair.legs[1].pb) + 0.04, legs: pair.legs, o: pair.legs[0].odds * pair.legs[1].odds });
+    if (ch.length) res.push({ best: Math.max(...ch.map(c => c.sc)), ch });
+  }
+  return res.sort((a, b) => b.best - a.best).slice(0, 8);
+}
+function bandPick(pool, avoidGames = new Set(), maxGames = 4) {
+  pool = pool.filter(c => !avoidGames.has(gid(c)));
+  for (const min of [0.6, 0.57, 0.54, 0.5]) {
+    const G = gameOptions(pool, min); if (G.length < 2) continue;
+    let best = null;
+    const rec = (i, pick, tot, n) => {
+      if (i === G.length) { if (n >= 2 && tot >= BAND_MIN) { const sc = pick.reduce((s, o) => s + o.sc, 0) / n - 0.04 * Math.abs(Math.log(tot / BAND_MID)) * 4 - (tot > BAND_MAX ? 0.5 : 0) - (n > 3 ? 0.01 * (n - 3) : 0) - (n < 3 ? 0.1 : 0); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
+      rec(i + 1, pick, tot, n);
+      if (n < maxGames) for (const o of G[i].ch) { pick.push(o); rec(i + 1, pick, tot * o.o, n + 1); pick.pop(); }
+    };
+    rec(0, [], 1, 0);
+    if (best) return best.pick.flatMap(o => o.legs);
+  }
+  return [];
+}
+let strong = bandPick(cands); 
 if (strong.length) { spec.strong.f = strong.map(toLeg); seen.add(sigOf(strong)); }
 const strongGames = new Set(strong.map(gid));
-let second = pickGames(cands, strongGames); if (second.length < 3) second = pick3(cands, new Set(strong.map(legSig)), strongGames);
+let second = bandPick(cands, strongGames);
 if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second)); }
 // טפסי שעות: צברים של עד שעה וחצי בין תחילות המשחקים
 { const fx = [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].filter(f => f.ts * 1000 > Date.now()).sort((a, b) => a.ts - b.ts);
   for (let i = 0; i < fx.length;) { const start = fx[i].ts, ids = new Set(), times = []; while (i < fx.length && fx[i].ts - start <= 90 * 60) { ids.add(String(fx[i].id)); times.push(ilMin(fx[i].ts)); i++; }
-    const L = pick3(cands.filter(c => ids.has(gid(c)))); if (L.length !== 3 || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
+    const L = bandPick(cands.filter(c => ids.has(gid(c)))); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
     const a = Math.min(...times), b = Math.max(...times); spec.win.push({ label: a === b ? 'משחקי ' + hhmm(a) : 'משחקי ' + hhmm(a) + '–' + hhmm(b), legs: L.map(toLeg) }); } }
 // טפסים קבועים: בונדסליגה שבת 16:30, פרמייר ליג שבת 17:00
 for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' }, { lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' }]) {
-  const L = pick3(cands.filter(c => Number(c.f.lg) === R.lg && ilDow(c.f.ts) === R.dow && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to)); if (L.length === 3) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
+  const L = bandPick(cands.filter(c => Number(c.f.lg) === R.lg && ilDow(c.f.ts) === R.dow && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to)); if (L.length) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
 // טופס חזק לכל ליגה (גם אם יש רק שלושה משחקים; בליגה עם פחות משלושה משחקים משלימים מהימור שני באותו משחק)
 for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
-  const L = pick3(cands.filter(c => Number(c.f.lg) === lg)); if (L.length !== 3 || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
+  const L = bandPick(cands.filter(c => Number(c.f.lg) === lg)); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
   const info = LEAGUES.find(l => l.id === lg); spec.fixed.push({ kind: 'league', label: (info ? info.he : 'ליגה ' + lg) + ' · כל משחקי היום', legs: L.map(toLeg) }); }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.stringify(spec, null, 1));
 // יחסי fivebet האמיתיים לכל הימור (לפי משחק ומפתח הימור): האתר מציג רק אותם, בלי יחס משוער
