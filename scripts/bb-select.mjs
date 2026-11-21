@@ -91,8 +91,9 @@ for (const G of site.games) {
   }
   try { extCands({ g, G, e, nba, hN, aN, PL: PLB, add, logs: LOGS }); } catch (err) { console.error('ext', name, err.message); }
 }
-const ok = c => c.tier === 'prop' ? (c.pb >= 0.62 && c.gap <= 0.2) : (c.pb >= 0.58 && c.gap <= 0.25);
-const pool = cands.filter(ok).sort((a, b) => b.pb - a.pb);
+const ok = c => c.tier === 'prop' ? (c.pb >= 0.64 && c.gap <= 0.18) : (c.pb >= 0.58 && c.gap <= 0.25);
+for (const c of cands) c.rk = c.pb - (c.tier === 'prop' ? 0.04 : 0);   // שווקים חדשים שעוד לא נבדקו: מדורגים נמוך יותר, כך שהימור מאומת בשווי דומה קודם
+const pool = cands.filter(ok).sort((a, b) => b.rk - a.rk);
 if (process.env.BB_DEBUG) for (const c of cands.filter(c => c.tier === 'prop').sort((a, b) => b.pb - a.pb)) console.log((ok(c) ? 'OK ' : '-- ') + c.pb.toFixed(2) + ' @' + c.odds + ' (מודל ' + c.pm + ', אתר ' + c.ps + ') ' + c.label + ' [' + c.key + ']');
 const leg = (c, sp) => ({ sport: sp, id: c.game.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, p: c.pb, ev: c.ev, why: c.why });
 const bySport = c => c.game.comp === 103 ? 'n' : 'e';
@@ -102,17 +103,18 @@ const PAIR_MIN = 0.62, kindOf = c => c.key.split('|')[0];
 // ב-fivebet אפשר לשלב ב-Bet Builder כל שני שווקים מאותו משחק. כאן: כל שני סוגים שונים, חוץ מכפילות (ניצחון+הנדיקאפ) וסתירה (סך נקודות מתחת עם קבוצה מעל, או להפך)
 const mktId = c => { const p = c.key.split('|'); return p[0] === 'pst' || p[0] === 'ts' ? p.slice(0, 3).join('|') : p.slice(0, 2).join('|'); };
 const totSide = c => { const p = c.key.split('|'); if (p[0] === 'total' || p[0] === 'th') return p[1]; if (/^(q[1-4]|h[12])$/.test(p[0]) && p[1] === 'total') return p[2]; if (p[0] === 'ts') return p[3]; return null; };
-const okPair = (x, y) => { if (mktId(x) === mktId(y)) return false; const kx = kindOf(x), ky = kindOf(y); if ([kx, ky].sort().join('+') === 'ml+spread') return false; const sx = totSide(x), sy = totSide(y); if (sx && sy && sx !== sy && kx !== 'pst' && ky !== 'pst') return false; if (kx === 'ts' && ky === 'ts' && x.key.split('|')[1] === y.key.split('|')[1]) return false; if ((kx === 'pst') && (ky === 'pst') && x.key.split('|')[1] === y.key.split('|')[1]) return false; return true; };
+const isPer = c => /^(q[1-4]|h[12])$/.test(c.key.split('|')[0]);
+const okPair = (x, y) => { if (mktId(x) === mktId(y)) return false; if (isPer(x) && isPer(y)) return false; const kx = kindOf(x), ky = kindOf(y); if ([kx, ky].sort().join('+') === 'ml+spread') return false; const sx = totSide(x), sy = totSide(y); if (sx && sy && sx !== sy && kx !== 'pst' && ky !== 'pst') return false; if (kx === 'ts' && ky === 'ts' && x.key.split('|')[1] === y.key.split('|')[1]) return false; if ((kx === 'pst') && (ky === 'pst') && x.key.split('|')[1] === y.key.split('|')[1]) return false; return true; };
 function pickBB(T, exclGames) {
   const byGame = new Map(); for (const c of T) { if (exclGames.has(c.game.id)) continue; (byGame.get(c.game.id) || byGame.set(c.game.id, []).get(c.game.id)).push(c); }
   const opts = [];
   for (const L of byGame.values()) {
-    L.sort((x, y) => y.pb - x.pb);
+    L.sort((x, y) => y.rk - x.rk);
     let pair = null;
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j]; if (!okPair(x, y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue; const p = x.pb * y.pb; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
     const single = L.find(c => c.odds >= 1.4);
-    if (pair && (!single || pair.p >= single.pb * 0.62)) opts.push({ sc: Math.max(pair.legs[0].pb, pair.legs[1].pb) + 0.04, id: L[0].game.id, legs: pair.legs });
-    else if (single) opts.push({ sc: single.pb, id: single.game.id, legs: [single] });
+    if (pair && (!single || pair.p >= single.pb * 0.62)) opts.push({ sc: Math.max(pair.legs[0].rk, pair.legs[1].rk) + 0.04, id: L[0].game.id, legs: pair.legs });
+    else if (single) opts.push({ sc: single.rk, id: single.game.id, legs: [single] });
   }
   return opts.sort((x, y) => y.sc - x.sc);
 }
