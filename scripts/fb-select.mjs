@@ -183,12 +183,12 @@ function gameOptions(pool, min) {
   for (const L of byGame.values()) {
     L.sort((x, y) => y.rank - x.rank);
     const ch = []; const single = L.find(c => c.odds >= 1.4);
-    if (single) ch.push({ sc: single.pb, legs: [single], o: single.odds });
+    if (single) ch.push({ sc: single.pb, pj: single.pb, legs: [single], o: single.odds });
     let pair = null;
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j];
       if (x.key === y.key || ['sh', 'sot'].includes(x.stat) || ['sh', 'sot'].includes(y.stat) || famKey(x) === famKey(y) || redundant(x, y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue;
       const p = pairProb(x, y); if (p < PAIR_JOINT_MIN) continue; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
-    if (pair) ch.push({ sc: Math.max(pair.legs[0].pb, pair.legs[1].pb) + 0.04, legs: pair.legs, o: pair.legs[0].odds * pair.legs[1].odds });
+    if (pair) ch.push({ sc: Math.max(pair.legs[0].pb, pair.legs[1].pb) + 0.04, pj: pair.p, legs: pair.legs, o: pair.legs[0].odds * pair.legs[1].odds });
     if (ch.length) res.push({ best: Math.max(...ch.map(c => c.sc)), ch });
   }
   return res.sort((a, b) => b.best - a.best).slice(0, 8);
@@ -199,7 +199,7 @@ function bandPick(pool, avoidGames = new Set(), maxGames = 4) {
     const G = gameOptions(pool, min); if (G.length < 2) continue;
     let best = null;
     const rec = (i, pick, tot, n) => {
-      if (i === G.length) { if (n >= 2 && tot >= BAND_MIN) { const sc = pick.reduce((s, o) => s + o.sc, 0) / n - 0.02 * Math.abs(Math.log(tot / BAND_MID)) - (n > 3 ? 0.01 * (n - 3) : 0) - (n < 3 ? 0.1 : 0); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
+      if (i === G.length) { if (n >= 2 && tot >= BAND_MIN) { const sc = pick.reduce((s, o) => s + Math.log(o.pj), 0) - 0.01 * Math.max(0, n - 4); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
       rec(i + 1, pick, tot, n);
       if (n < maxGames) for (const o of G[i].ch) { pick.push(o); rec(i + 1, pick, tot * o.o, n + 1); pick.pop(); }
     };

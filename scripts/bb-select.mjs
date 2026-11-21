@@ -113,14 +113,26 @@ function pickBB(T, exclGames) {
     let pair = null;
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j]; if (!okPair(x, y) || Math.min(x.pb, y.pb) < (x.tier === 'prop' || y.tier === 'prop' ? 0.6 : PAIR_MIN) || x.odds * y.odds < 1.8) continue; const p = x.pb * y.pb; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
     const single = L.find(c => c.odds >= 1.4);
-    if (pair && (!single || pair.p >= single.pb * 0.62)) opts.push({ sc: Math.max(pair.legs[0].rk, pair.legs[1].rk) + 0.04, id: L[0].game.id, legs: pair.legs });
-    else if (single) opts.push({ sc: single.rk, id: single.game.id, legs: [single] });
+    if (pair && (!single || pair.p >= single.pb * 0.62)) opts.push({ sc: Math.max(pair.legs[0].rk, pair.legs[1].rk) + 0.04, pj: pair.p, alt: single ? { sc: single.rk, pj: single.pb, id: single.game.id, legs: [single] } : null, id: L[0].game.id, legs: pair.legs });
+    else if (single) opts.push({ sc: single.rk, pj: single.pb, id: single.game.id, legs: [single] });
   }
   return opts.sort((x, y) => y.sc - x.sc);
 }
 // יחס כולל לפחות 3.5 (יעד 4-5): מוסיפים משחקים חזקים נוספים עד שמגיעים, ואם עדיין לא מגיעים לא מציגים טופס
 const prodO = os => os.reduce((p, o) => p * o.legs.reduce((q, c) => q * c.odds, 1), 1);
-function bandBB(opts, min = 3) { const A = opts.slice(0, min); let i = min; while (prodO(A) < 3.5 && i < opts.length && A.length < 5) A.push(opts[i++]); return prodO(A) >= 3.5 ? A : []; }
+// בוחרים את צירוף המשחקים שממקסם את הסיכוי שהטופס כולו יעבור, בתנאי שהיחס הכולל לפחות 3.5 (לכל משחק: הימור בודד או שילוב)
+function bandBB(opts, min = 3) {
+  const top = opts.slice(0, 9); let best = null;
+  const rec = (i, pick, tot, lp) => {
+    if (i === top.length) { if (pick.length >= Math.min(min, 2) && tot >= 3.5 && (!best || lp > best.lp)) best = { lp, pick: pick.slice() }; return; }
+    rec(i + 1, pick, tot, lp);
+    if (pick.length < 5) { const o = top[i], variants = o.alt ? [o, o.alt] : [o]; for (const v of variants) { pick.push(v); rec(i + 1, pick, tot * v.legs.reduce((q, c) => q * c.odds, 1), lp + Math.log(v.pj)); pick.pop(); } }
+  };
+  rec(0, [], 1, 0);
+  if (!best) return [];
+  const order = new Map(opts.map((o, i) => [o.id, i]));
+  return best.pick.sort((x, y) => (order.get(x.id) ?? 0) - (order.get(y.id) ?? 0));
+}
 for (const sp of ['n', 'e']) {
   const T = pool.filter(c => bySport(c) === sp);
   const A = bandBB(pickBB(T, new Set()), sp === 'e' ? 1 : 3);

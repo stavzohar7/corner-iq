@@ -39,13 +39,19 @@ const ladderOf = L => { const rows = L.slice(1).filter(x => x && x !== 'Á'), d 
 const playersOf = L => { const rows = L.slice(1).filter(x => x && x !== 'Á'), by = {};
   for (let k = 0; k + 1 < rows.length; k += 2) { const m = rows[k].match(/^(.+?) - (Over|Under) ([\d.]+)$/); if (!m) continue; const e = by[m[1] + '|' + m[3]] || (by[m[1] + '|' + m[3]] = [m[1], +m[3], null, null]); e[m[2] === 'Over' ? 2 : 3] = nx(rows[k + 1]); }
   return Object.values(by).filter(e => e[2] && e[3]); };
+const eqOf = L => { const rows = L.slice(1).filter(x => x && x !== 'Á'), by = {};
+  for (let k = 0; k + 1 < rows.length; k += 2) { const m = rows[k].match(/^(.+?) (\d+)$/); if (!m) continue; const o = nx(rows[k + 1]); if (!(o >= 1.3 && o <= 2.3)) continue; (by[m[1]] = by[m[1]] || []).push([+m[2], o]); }
+  const out = []; for (const [n, a] of Object.entries(by)) for (const [N, o] of a) out.push([n, N, o]); return out; };
 window.__bbExt = async () => {
   const ext = {}, per = { '1st Half': 'h1', '2nd Half': 'h2', '1st Quarter': 'q1', '2nd Quarter': 'q2', '3rd Quarter': 'q3', '4th Quarter': 'q4' }, kinds = { 'Total': 'tot', 'Handicap': 'hc', 'Total team 1': 't1', 'Total team 2': 't2' };
   for (const b of window.__blocks()) { const L = b.split('\n'), m = L[0].trim().match(/^(1st|2nd|3rd|4th) (Half|Quarter): (Total|Handicap|Total team 1|Total team 2)$/); if (!m) continue; const lad = ladderOf(L); if (lad.length) (ext[per[m[1] + ' ' + m[2]]] = ext[per[m[1] + ' ' + m[2]]] || {})[kinds[m[3]]] = lad; }
   for (const [tab, key] of [['3-Points', 'tp3'], ['Rebounds', 'reb'], ['Assists', 'ast']]) { if (!await window.__clickTab(tab)) continue;
     for (const b of window.__blocks()) { const L = b.split('\n'), t = L[0].trim(), m = t.match(/^[\w-]+: (Total|Total team 1|Total team 2)$/); if (!m) continue; const lad = ladderOf(L); if (lad.length) (ext[key] = ext[key] || {})[kinds[m[1]]] = lad; } }
   if (await window.__clickTab('Players')) { const T = { 'Players: Player Total Points': 'pts', 'Players: Assists': 'ast', 'Players: Player Total Rebounds': 'reb', 'Players: Player Total 3-Points Made': 'tpm', 'Players: Points, Assists and Rebound': 'pra' }, pl = {};
-    for (const b of window.__blocks()) { const L = b.split('\n'), k = T[L[0].trim()]; if (k) pl[k] = playersOf(L); } if (Object.keys(pl).length) ext.pl = pl; }
+    for (const b of window.__blocks()) { const L = b.split('\n'), k = T[L[0].trim()]; if (k) pl[k] = playersOf(L); }
+    const E = { 'Players: Points: Equal or More': 'pts', 'Players: Player Assists: Equal or More': 'ast', 'Players: Player Rebounds: Equal or More': 'reb', 'Players: Player 3-Points: Equal or More': 'tpm', 'Players: Player Points+Assists+Rebounds: Equal or More': 'pra' }, eq = {};
+    for (const b of window.__blocks()) { const L = b.split('\n'), k = E[L[0].trim()]; if (k) eq[k] = eqOf(L); } if (Object.keys(eq).length) pl.eq = eq;
+    if (Object.keys(pl).length) ext.pl = pl; }
   await window.__clickTab('Main'); return ext; };
 
 window.__bbRead = async (ids, first) => { const F = JSON.parse(localStorage.__BB || '{}'), res = []; for (let n = 0; n < ids.length; n++) { if (!(first && n === 0)) await window.__back(); const o = await window.__open(ids[n]); if (o === 'ok') { F[ids[n]] = window.__bb(); try { F[ids[n]].ext = await window.__bbExt(); } catch (e) { F[ids[n]].ext = null; } localStorage.__BB = JSON.stringify(F); } res.push([ids[n], o]); } return res; };

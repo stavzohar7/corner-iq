@@ -97,7 +97,7 @@ export function extCands(ctx) {
   const P = ext.pl; if (P && g.players) {
     const roster = [...(g.players.h || []), ...(g.players.a || [])].filter(x => x && x.en && !x.ques && x.min >= 20), byName = new Map(roster.map(x => [norm(x.en), x]));
     const TEAMN = x => (g.players.h || []).includes(x) ? hN : aN;
-    for (const [stt, rows] of Object.entries(P)) for (const [name, ln, o, u] of rows) {
+    for (const [stt, rows] of Object.entries(P)) { if (stt === 'eq') continue; for (const [name, ln, o, u] of rows) {
       const pl = byName.get(norm(name)); if (!pl || !half(ln)) continue;
       let mu, sdv, he, pm;
       if (stt === 'pts' || stt === 'reb' || stt === 'ast') { const S = pl[stt]; if (!S || !(S.sd > 0)) continue; mu = S.p; sdv = S.sd * 1.05; he = { pts: 'נקודות', reb: 'ריבאונדים', ast: 'אסיסטים' }[stt]; }
@@ -111,6 +111,18 @@ export function extCands(ctx) {
       const nm = pl.name, id = pl.id;
       if (ln <= mu - (stt === 'tpm' ? 0.6 : 1.5)) add(`pst|${id}|${stt}|over|${ln}`, `${nm} מעל ${ln} ${he}`, o, pOver, ps, 'pl-over', `${base} ${ctxLine}`, false, 0, 'prop');
       if (ln >= mu + (stt === 'tpm' ? 0.6 : 1.5)) add(`pst|${id}|${stt}|under|${ln}`, `${nm} מתחת ל-${ln} ${he}`, u, 1 - pOver, 1 - ps, 'pl-under', `${base} ${ctxLine}`, false, 0, 'prop');
+    } }
+    // סולמות "לפחות N": הימור על "מעל" בלבד, בכמה רמות. ההסתברות מהמודל (מכויל לאחור), ומהיחס של האתר מוציאים את עמלת האתר בקירוב
+    for (const [stt, rows] of Object.entries(P.eq || {})) for (const [name, N, o] of rows) {
+      const pl = byName.get(norm(name)); if (!pl) continue;
+      let mu, sdv, he;
+      if (stt === 'pts' || stt === 'reb' || stt === 'ast') { const S = pl[stt]; if (!S || !(S.sd > 0)) continue; mu = S.p; sdv = S.sd * 1.05; he = { pts: 'נקודות', reb: 'ריבאונדים', ast: 'אסיסטים' }[stt]; }
+      else if (stt === 'pra') { if (!pl.pts || !pl.reb || !pl.ast) continue; mu = pl.pts.p + pl.reb.p + pl.ast.p; sdv = Math.sqrt(pl.pts.sd ** 2 + pl.reb.sd ** 2 + pl.ast.sd ** 2) * 1.15; he = 'נקודות+ריבאונדים+אסיסטים'; }
+      else if (stt === 'tpm') { if (!(pl.tpm >= 0)) continue; mu = pl.tpm; he = 'שלשות'; }
+      else continue;
+      const pm = stt === 'tpm' ? 1 - poissonCdf(N - 1, mu) : 1 - cdf((N - 0.5 - mu) / sdv), ps = Math.min(0.95, (1 / o) / 1.07);
+      if (pm < 0.6) continue;
+      add(`pst|${pl.id}|${stt}|over|${N - 0.5}`, `${pl.name} לפחות ${N} ${he}`, o, pm, ps, 'pl-eq', `${pl.name} (${TEAMN(pl)}) משחק בממוצע ${r1(pl.min)} דקות. הצפי שלנו לפי 15 המשחקים האחרונים ולפי סוג המשחק הוא ${r1(mu)} ${he}, ולכן ${N} ומעלה צפוי להשיג.${pl.why && pl.why[0] ? ' ' + pl.why[0] : ''}`, false, 0, 'prop');
     }
   }
 }
