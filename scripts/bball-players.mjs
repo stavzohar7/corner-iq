@@ -15,7 +15,7 @@ const mins = v => { const m = String(v || '').match(/^(\d+):(\d+)/); return m ? 
 const seasonOfTs = ts => { const d = new Date(ts * 1000); return d.getUTCMonth() >= 6 ? d.getUTCFullYear() : d.getUTCFullYear() - 1; };
 
 // ---------- יומן משחקים ----------
-async function fetchBox(id) {
+export async function fetchBox(id) {
   const j = await http(`${BASE}/game/?${Q}&gameId=${id}`);
   const g = j && j.game; if (!g || !g.homeCompetitor || !g.homeCompetitor.lineups) return null;
   const nm = new Map((g.members || []).map(m => [m.id, { a: m.athleteId, n: m.name }]));
@@ -32,15 +32,16 @@ async function fetchBox(id) {
       rows.push([who.a, C.id, Math.round(min * 10) / 10, num(st[2]), num(st[17]), num(st[18]), num(st[9]), m.statusText === 'Starting' ? 1 : 0]);
     }
   }
-  return rows.length >= 8 ? { rows, names, coach } : null;
+  const q = (g.stages || []).filter(x => /^Q[1-4]$/.test(x.shortName || x.name || '')).sort((a, b) => String(a.shortName).localeCompare(String(b.shortName))).map(x => [x.homeCompetitorScore, x.awayCompetitorScore]);
+  return rows.length >= 8 ? { rows, names, coach, q: q.length === 4 ? q : null } : null;
 }
 export async function syncPlayers(pl, games, maxCalls, log = () => {}) {
   const recent = Date.now() / 1000 - 120 * 86400;
-  const need = games.filter(g => !pl.games[g.id] || (pl.games[g.id].c === undefined && pl.games[g.id].p && pl.games[g.id].p.length && g.ts > recent)).sort((a, b) => b.ts - a.ts).slice(0, maxCalls);
+  const need = games.filter(g => !pl.games[g.id] || (pl.games[g.id].c === undefined && pl.games[g.id].p && pl.games[g.id].p.length && g.ts > recent) || (pl.games[g.id].q === undefined && pl.games[g.id].p && pl.games[g.id].p.length)).sort((a, b) => b.ts - a.ts).slice(0, maxCalls);
   let n = 0;
   await pool(need, async g => {
     const b = await fetchBox(g.id);
-    pl.games[g.id] = b ? { ts: g.ts, comp: g.comp, h: g.h, a: g.a, g: g.g, c: b.coach, p: b.rows } : { ts: g.ts, comp: g.comp, h: g.h, a: g.a, g: g.g, p: [] };
+    pl.games[g.id] = b ? { ts: g.ts, comp: g.comp, h: g.h, a: g.a, g: g.g, c: b.coach, q: b.q || null, p: b.rows } : { ts: g.ts, comp: g.comp, h: g.h, a: g.a, g: g.g, p: [] };
     if (b) Object.assign(pl.names, b.names);
     if (++n % 100 === 0) log(`כדורסל: שחקנים ${n}/${need.length}`);
   }, 4);

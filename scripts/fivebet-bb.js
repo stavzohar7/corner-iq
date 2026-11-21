@@ -22,6 +22,30 @@ window.__rowSel = () => [...document.querySelectorAll('*')].filter(e => e.childr
 window.__back = async () => { history.back(); for (let w = 0; w < 20; w++) { await new Promise(r => setTimeout(r, 1000)); if (window.__rowSel().length) return 'ok'; } return 'timeout'; };
 window.__open = async id => { const el = window.__rowSel().find(e => (e.innerText || '').trim() === id); if (!el) return 'norow'; el.click(); for (let w = 0; w < 20; w++) { await new Promise(r => setTimeout(r, 1000)); if (window.__blocks().length > 50) return 'ok'; } return 'timeout'; };
 // קורא משחקים לפי רשימת מזהים ("+2440"). מהקריאה הראשונה לעמוד הרשימה: first=true (בלי history.back לפני הפתיחה)
-window.__bbRead = async (ids, first) => { const F = JSON.parse(localStorage.__BB || '{}'), res = []; for (let n = 0; n < ids.length; n++) { if (!(first && n === 0)) await window.__back(); const o = await window.__open(ids[n]); if (o === 'ok') { F[ids[n]] = window.__bb(); localStorage.__BB = JSON.stringify(F); } res.push([ids[n], o]); } return res; };
+window.__bbReadOld = async (ids, first) => { const F = JSON.parse(localStorage.__BB || '{}'), res = []; for (let n = 0; n < ids.length; n++) { if (!(first && n === 0)) await window.__back(); const o = await window.__open(ids[n]); if (o === 'ok') { F[ids[n]] = window.__bb(); localStorage.__BB = JSON.stringify(F); } res.push([ids[n], o]); } return res; };
 const trim = (arr, w) => { if (!arr || !arr.length) return arr; let best = arr[0]; for (const r of arr) if (Math.abs(r[1] - r[2]) < Math.abs(best[1] - best[2])) best = r; return arr.filter(r => Math.abs(r[0] - best[0]) <= w); };
-window.__bbExport = map => { const F = JSON.parse(localStorage.__BB || '{}'); return JSON.stringify({ games: Object.keys(map).filter(k => F[k]).map(k => ({ id: map[k], ladders: { hc: trim(F[k].hc, 8), tot: trim(F[k].tot, 14), t1: trim(F[k].t1, 7), t2: trim(F[k].t2, 7), r: F[k].r } })) }); };
+window.__bbExport = map => { const F = JSON.parse(localStorage.__BB || '{}'); return JSON.stringify({ games: Object.keys(map).filter(k => F[k]).map(k => ({ id: map[k], ladders: { hc: trim(F[k].hc, 8), tot: trim(F[k].tot, 14), t1: trim(F[k].t1, 7), t2: trim(F[k].t2, 7), r: F[k].r }, ext: F[k].ext || null })) }); };
+
+// ===== הרחבה: רבעים, מחציות, סטטיסטיקות קבוצה (שלשות, ריבאונדים, אסיסטים) ושחקנים =====
+const nx = x => parseFloat(String(x).replace(/[^\d.\-+]/g, ''));
+const leaf2 = n => [...document.querySelectorAll('*')].filter(e => e.children.length === 0 && (e.innerText || '').trim() === n);
+window.__clickTab = async n => { const els = leaf2(n); if (!els.length) return false; els[els.length - 1].click(); await new Promise(r => setTimeout(r, 2600)); return true; };
+const ladderOf = L => { const rows = L.slice(1).filter(x => x && x !== 'Á'), d = {}, hc = /^Handicap/.test(rows[0] || '');
+  for (let k = 0; k + 1 < rows.length; k += 2) { const m = rows[k].match(/^(Over|Under|Handicap 1|Handicap 2)\s*‎?\s*\(([^)]+)\)/); if (m) d[m[1] + '|' + nx(m[2])] = nx(rows[k + 1]); }
+  const o = []; for (const k of Object.keys(d)) { const ln = +k.split('|')[1];
+    if (hc) { if (!k.startsWith('Handicap 1|')) continue; const a = d[k], c = d['Handicap 2|' + (-ln)]; if (c != null && ((a >= 1.3 && a <= 3.2) || (c >= 1.3 && c <= 3.2))) o.push([ln, a, c]); }
+    else { if (!k.startsWith('Over|')) continue; const a = d[k], c = d['Under|' + ln]; if (c != null && ((a >= 1.3 && a <= 3.2) || (c >= 1.3 && c <= 3.2))) o.push([ln, a, c]); } }
+  o.sort((x, y) => x[0] - y[0]); let bi = 0; o.forEach((r, i) => { if (Math.abs(r[1] - r[2]) < Math.abs(o[bi][1] - o[bi][2])) bi = i; }); return o.slice(Math.max(0, bi - 6), bi + 7); };
+const playersOf = L => { const rows = L.slice(1).filter(x => x && x !== 'Á'), by = {};
+  for (let k = 0; k + 1 < rows.length; k += 2) { const m = rows[k].match(/^(.+?) - (Over|Under) ([\d.]+)$/); if (!m) continue; const e = by[m[1] + '|' + m[3]] || (by[m[1] + '|' + m[3]] = [m[1], +m[3], null, null]); e[m[2] === 'Over' ? 2 : 3] = nx(rows[k + 1]); }
+  return Object.values(by).filter(e => e[2] && e[3]); };
+window.__bbExt = async () => {
+  const ext = {}, per = { '1st Half': 'h1', '2nd Half': 'h2', '1st Quarter': 'q1', '2nd Quarter': 'q2', '3rd Quarter': 'q3', '4th Quarter': 'q4' }, kinds = { 'Total': 'tot', 'Handicap': 'hc', 'Total team 1': 't1', 'Total team 2': 't2' };
+  for (const b of window.__blocks()) { const L = b.split('\n'), m = L[0].trim().match(/^(1st|2nd|3rd|4th) (Half|Quarter): (Total|Handicap|Total team 1|Total team 2)$/); if (!m) continue; const lad = ladderOf(L); if (lad.length) (ext[per[m[1] + ' ' + m[2]]] = ext[per[m[1] + ' ' + m[2]]] || {})[kinds[m[3]]] = lad; }
+  for (const [tab, key] of [['3-Points', 'tp3'], ['Rebounds', 'reb'], ['Assists', 'ast']]) { if (!await window.__clickTab(tab)) continue;
+    for (const b of window.__blocks()) { const L = b.split('\n'), t = L[0].trim(), m = t.match(/^[\w-]+: (Total|Total team 1|Total team 2)$/); if (!m) continue; const lad = ladderOf(L); if (lad.length) (ext[key] = ext[key] || {})[kinds[m[1]]] = lad; } }
+  if (await window.__clickTab('Players')) { const T = { 'Players: Player Total Points': 'pts', 'Players: Assists': 'ast', 'Players: Player Total Rebounds': 'reb', 'Players: Player Total 3-Points Made': 'tpm', 'Players: Points, Assists and Rebound': 'pra' }, pl = {};
+    for (const b of window.__blocks()) { const L = b.split('\n'), k = T[L[0].trim()]; if (k) pl[k] = playersOf(L); } if (Object.keys(pl).length) ext.pl = pl; }
+  await window.__clickTab('Main'); return ext; };
+
+window.__bbRead = async (ids, first) => { const F = JSON.parse(localStorage.__BB || '{}'), res = []; for (let n = 0; n < ids.length; n++) { if (!(first && n === 0)) await window.__back(); const o = await window.__open(ids[n]); if (o === 'ok') { F[ids[n]] = window.__bb(); try { F[ids[n]].ext = await window.__bbExt(); } catch (e) { F[ids[n]].ext = null; } localStorage.__BB = JSON.stringify(F); } res.push([ids[n], o]); } return res; };

@@ -163,8 +163,24 @@ function bbFallback(leg, g, root) {
     const [, pid, stt, sd, ln2] = leg.key.split('|'), box = loadPL(root).games[String(leg.id)]; if (!box) return null;
     const row = box.p.find(x => String(x[0]) === pid); if (!row) return null;
     if (!(row[2] > 0)) return { res: 'push', act: 'לא שיחק (ההימור מוחזר)' };
-    const col = { pts: 3, reb: 4, ast: 5, tpm: 6 }[stt], v = row[col], L2 = Number(ln2), HE = { pts: 'נקודות', reb: 'ריבאונדים', ast: 'אסיסטים', tpm: 'שלשות' }[stt];
+    const col = { pts: 3, reb: 4, ast: 5, tpm: 6 }[stt], v = stt === 'pra' ? row[3] + row[4] + row[5] : row[col], L2 = Number(ln2), HE = { pts: 'נקודות', reb: 'ריבאונדים', ast: 'אסיסטים', tpm: 'שלשות', pra: 'נקודות+ריבאונדים+אסיסטים' }[stt];
     return { res: v === L2 ? 'push' : ((v > L2) === (sd === 'over')) ? 'win' : 'lose', act: 'סיים עם ' + v + ' ' + HE };
+  }
+  const kp = leg.key.split('|');
+  if (/^(q[1-4]|h[12])$/.test(kp[0])) {                               // רבעים ומחציות: per|total|over|L  או  per|spread|home/away|L (הקו של הצד שנבחר)
+    const box = loadPL(root).games[String(leg.id)]; if (!box || !box.q) return null;
+    const idx = { q1: [0], q2: [1], q3: [2], q4: [3], h1: [0, 1], h2: [2, 3] }[kp[0]], PN = { q1: 'הרבע הראשון', q2: 'הרבע השני', q3: 'הרבע השלישי', q4: 'הרבע הרביעי', h1: 'המחצית הראשונה', h2: 'המחצית השנייה' }[kp[0]];
+    let t = 0, m = 0; for (const i of idx) { t += box.q[i][0] + box.q[i][1]; m += box.q[i][0] - box.q[i][1]; }
+    const L = Number(kp[3]);
+    if (kp[1] === 'total') return { res: t === L ? 'push' : ((t > L) === (kp[2] === 'over')) ? 'win' : 'lose', act: PN + ' הסתיים ב-' + t + ' נקודות בסך הכל' };
+    if (kp[1] === 'spread') { const v = (kp[2] === 'home' ? m : -m) + L; return { res: v === 0 ? 'push' : v > 0 ? 'win' : 'lose', act: PN + ': ' + (m === 0 ? 'שוויון' : (m > 0 ? 'המארחת' : 'האורחת') + ' ניצחה ב-' + Math.abs(m)) }; }
+    return null;
+  }
+  if (kp[0] === 'ts') {                                               // סטטיסטיקת קבוצה: ts|tpm/reb/ast|total/home/away|over/under|L
+    const box = loadPL(root).games[String(leg.id)]; if (!box || !box.p || !box.p.length) return null;
+    const col = { tpm: 6, reb: 4, ast: 5 }[kp[1]], HEs = { tpm: 'שלשות', reb: 'ריבאונדים', ast: 'אסיסטים' }[kp[1]], sum = tid => box.p.filter(x => x[1] === tid).reduce((a, x) => a + x[col], 0);
+    const v = kp[2] === 'home' ? sum(box.h) : kp[2] === 'away' ? sum(box.a) : sum(box.h) + sum(box.a), L = Number(kp[4]);
+    return { res: v === L ? 'push' : ((v > L) === (kp[3] === 'over')) ? 'win' : 'lose', act: 'סיימו עם ' + v + ' ' + HEs };
   }
   const [grp, side, ln] = leg.key.split('|'), line = Number(ln), [hp, ap] = g.result.g, cmp = (x, over) => x === line ? 'push' : (over ? x > line : x < line) ? 'win' : 'lose';
   const hn = clean(g.home && g.home.name), an = clean(g.away && g.away.name);

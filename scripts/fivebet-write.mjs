@@ -22,7 +22,7 @@ const full = l => {
   if (!(l.odds >= 1.2)) throw new Error("יחס מתחת ל-1.2: " + l.label);
   if (fx.ts * 1000 < Date.now()) throw new Error('המשחק כבר התחיל: ' + l.label);
   const [a, b, c] = l.key.split('|');
-  const o = { sport: l.sport, id: fx.id, mi: -1, key: l.key, kind: l.sport === 'f' ? [a, b, c].join('|') : a + '|' + b, label: l.label, game: clean(fx.home.name) + ' – ' + clean(fx.away.name), ts: fx.ts, odds: l.odds, score: l.score || 6, p: l.p || 0, ev: l.ev || 0, src: 'fivebet' };
+  const o = { sport: l.sport, id: fx.id, mi: -1, key: l.key, kind: l.sport === 'f' ? [a, b, c].join('|') : a === 'pst' ? 'pst|' + l.key.split('|')[2] : a === 'ts' ? 'ts|' + b : a + '|' + b, label: l.label, game: clean(fx.home.name) + ' – ' + clean(fx.away.name), ts: fx.ts, odds: l.odds, score: l.score || 6, p: l.p || 0, ev: l.ev || 0, src: 'fivebet' };
   if (l.sport === 'f') { o.lg = fx.lg; o.stat = a; } else { o.grp = a; o.sd = b; o.prop = a === 'pst'; }
   if (l.why) o.why = l.why;
   if (l.fb) o.fb = l.fb;   // נתיב המשחק באתר fivebet: משמש את כפתור "בנה קופון"

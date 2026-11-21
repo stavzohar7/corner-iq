@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extCands, buildLogs, loadBox } from './bb-ext.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const date = process.argv[2] || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jerusalem' }).format(new Date());
@@ -15,7 +16,8 @@ const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 const site = readJson(path.join(ROOT, 'data', 'cache', 'siteodds', `bb-${date}.json`)), day = readJson(path.join(ROOT, 'data', 'bball', `${date}.json`));
 const clean = x => String(x || '').replace(/[⁦-⁩]/g, '').trim();
 let CAL = {}; try { CAL = readJson(path.join(ROOT, 'data', 'knowledge', 'calibration.json')).sports.b.kinds || {}; } catch (e) {}
-const calFix = key => { const K = CAL[key.split('|').slice(0, 2).join('|')]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 15))); };
+const calKey = key => { const p = key.split('|'); return p[0] === 'pst' ? 'pst|' + p[2] : p[0] === 'ts' ? 'ts|' + p[1] : p.slice(0, 2).join('|'); };
+const calFix = key => { const K = CAL[calKey(key)]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 15))); };
 
 // התפלגות נורמלית
 const erf = x => { const t = 1 / (1 + 0.3275911 * Math.abs(x)), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; };
@@ -36,23 +38,25 @@ const endDot = x => /[.!?]$/.test(x) ? x : x + '.';
 function whyOf(g, kind, av, logic) {
   const S = (g.story || []).map(clean), pick = re => S.find(x => re.test(x)) || '';
   const nature = S[0] || '', pace = pick(/^בנקודות/), teams = pick(/: .*\(\d+-\d+/), inj = pick(/^חיסורים/), hth = pick(/בבית \d+-\d+/);
-  const base = av || teams, parts = kind === 'th' ? [base, inj, logic] : [nature, base, inj, logic];
+  const base = av || teams, parts = kind === 'prop' ? [logic, nature, inj] : kind === 'th' ? [base, inj, logic] : [nature, base, inj, logic];
   const seen = new Set(), out = [];
   for (const p of parts) { const t = clean(p); if (!t || seen.has(t)) continue; seen.add(t); out.push(endDot(t)); }
   return out.slice(0, 4).join(' ');
 }
 
+const PLB = loadBox(ROOT), LOGS = buildLogs(PLB, Date.now() / 1000);
 const cands = [];
 for (const G of site.games) {
-  const g = day.fixtures.find(f => String(f.id) === String(G.id)); if (!g || g.ts * 1000 < Date.now() + 10 * 60e3 || !g.exp) continue;
+  const g = day.fixtures.find(f => String(f.id) === String(G.id)); if (!g || (!process.env.BB_ALL && g.ts * 1000 < Date.now() + 10 * 60e3) || !g.exp) continue;
   const sd = SD[g.comp] || SD[103], e = g.exp, L = G.ladders, nba = g.comp === 103, AV = avgs(g);
   const hN = clean(g.home.name), aN = clean(g.away.name), name = hN + '–' + aN, game = { id: g.id, name, comp: g.comp, e, g };
   const half = ln => Math.abs(ln * 2 - Math.round(ln * 2)) < 1e-9 && Math.round(ln * 2) % 2 === 1;   // רק קווים עם .5 (בלי החזר)
   const avLine = AV ? `${hN} קולעת בממוצע ${r1(AV.hh.ppg)} נקודות בבית וסופגת ${r1(AV.hh.opp)}. ${aN} קולעת בממוצע ${r1(AV.aa.ppg)} נקודות בחוץ וסופגת ${r1(AV.aa.opp)}.` : '';
-  const add = (key, label, odds, pm, ps, kind, logic, block, dStyle) => {
+  const add = (key, label, odds, pm, ps, kind, logic, block, dStyle, tier) => {
     if (!(odds >= 1.2) || pm == null || block) return;
+    if (tier === 'prop') pm = 0.7 * pm + 0.3 * ps;   // שווקים חדשים שעוד לא נבדקו מול תוצאות: נותנים משקל גדול יותר ליחס של האתר
     const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + (dStyle || 0)));
-    cands.push({ game, key, label: `${label} (${name})`, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), gap: +Math.abs(pm - ps).toFixed(3), ev: +(pb * odds - 1).toFixed(3), kind, why: whyOf(g, key.split('|')[0], avLine, logic) });
+    cands.push({ game, key, label: `${label} (${name})`, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), gap: +Math.abs(pm - ps).toFixed(3), ev: +(pb * odds - 1).toFixed(3), kind, tier: tier || null, why: whyOf(g, tier === 'prop' ? 'prop' : key.split('|')[0], avLine, logic) });
   };
   // סך נקודות: רק "מתחת", ורק כשהקו גבוה מהצפי. נבדק מול הממוצע בפועל של שתי הקבוצות: הקו חייב להיות גבוה ממנו ב-4 נקודות לפחות
   for (const [ln, o, u] of L.tot || []) if (half(ln) && ln >= e.total + 6) {
@@ -85,16 +89,20 @@ for (const G of site.games) {
     add('ml|home|', `${hN} מנצחת`, homeOdds, cdf(e.margin / sd.m), fair(homeOdds, awayOdds), 'home-win',
       `${hN} הפייבוריטית: הצפי שלנו הוא ניצחון בכ-${r1(e.margin)} נקודות.`, AV && AV.margin < 1, AV ? Math.max(-0.08, Math.min(0.05, (AV.margin - 3) * 0.006)) : 0);
   }
+  try { extCands({ g, G, e, nba, hN, aN, PL: PLB, add, logs: LOGS }); } catch (err) { console.error('ext', name, err.message); }
 }
-const ok = c => c.pb >= 0.58 && c.gap <= 0.25;
+const ok = c => c.tier === 'prop' ? (c.pb >= 0.62 && c.gap <= 0.2) : (c.pb >= 0.58 && c.gap <= 0.25);
 const pool = cands.filter(ok).sort((a, b) => b.pb - a.pb);
+if (process.env.BB_DEBUG) for (const c of cands.filter(c => c.tier === 'prop').sort((a, b) => b.pb - a.pb)) console.log((ok(c) ? 'OK ' : '-- ') + c.pb.toFixed(2) + ' @' + c.odds + ' (מודל ' + c.pm + ', אתר ' + c.ps + ') ' + c.label + ' [' + c.key + ']');
 const leg = (c, sp) => ({ sport: sp, id: c.game.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, p: c.pb, ev: c.ev, why: c.why });
 const bySport = c => c.game.comp === 103 ? 'n' : 'e';
 const spec = { date, strong: {}, second: {} };
 // טפסים חזקים: עד 3 משחקים. הימור שני באותו משחק רק אם הוא חזק (רף גבוה), מסוג שונה ולא סותר, ושני ההימורים יחד ביחס 1.8 לפחות.
 const PAIR_MIN = 0.62, kindOf = c => c.key.split('|')[0];
 // ב-fivebet אפשר לשלב ב-Bet Builder כל שני שווקים מאותו משחק. כאן: כל שני סוגים שונים, חוץ מכפילות (ניצחון+הנדיקאפ) וסתירה (סך נקודות מתחת עם קבוצה מעל, או להפך)
-const sideOf2 = c => c.key.split('|')[1], okPair = (x, y) => { const kx = kindOf(x), ky = kindOf(y); if (kx === ky) return false; const ks = [kx, ky].sort().join('+'); if (ks === 'ml+spread') return false; if (ks === 'th+total' || ks === 'ta+total' || ks === 'spread+th' && false) { const t = kx === 'total' ? x : y, o = kx === 'total' ? y : x; if (sideOf2(t) !== sideOf2(o)) return false; } return true; };
+const mktId = c => { const p = c.key.split('|'); return p[0] === 'pst' || p[0] === 'ts' ? p.slice(0, 3).join('|') : p.slice(0, 2).join('|'); };
+const totSide = c => { const p = c.key.split('|'); if (p[0] === 'total' || p[0] === 'th') return p[1]; if (/^(q[1-4]|h[12])$/.test(p[0]) && p[1] === 'total') return p[2]; if (p[0] === 'ts') return p[3]; return null; };
+const okPair = (x, y) => { if (mktId(x) === mktId(y)) return false; const kx = kindOf(x), ky = kindOf(y); if ([kx, ky].sort().join('+') === 'ml+spread') return false; const sx = totSide(x), sy = totSide(y); if (sx && sy && sx !== sy && kx !== 'pst' && ky !== 'pst') return false; if (kx === 'ts' && ky === 'ts' && x.key.split('|')[1] === y.key.split('|')[1]) return false; if ((kx === 'pst') && (ky === 'pst') && x.key.split('|')[1] === y.key.split('|')[1]) return false; return true; };
 function pickBB(T, exclGames) {
   const byGame = new Map(); for (const c of T) { if (exclGames.has(c.game.id)) continue; (byGame.get(c.game.id) || byGame.set(c.game.id, []).get(c.game.id)).push(c); }
   const opts = [];
