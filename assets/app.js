@@ -352,14 +352,15 @@ function slipCardHtml(d, S, title, sub, cls) {
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
     '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : S.legs.every(l => l.est) ? 'משוער' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div>' + (S.res ? '<p class="muted slipFoot">' + (S.res === 'win' ? '<b class="pos">נתפס ✅</b>' : S.res === 'lose' ? '<b class="neg">נפל ❌</b>' : '') + '</p>' : '') + '</div>';
 }
-function ciqSlipTab(btn, id) { const box = btn.closest('.slipGroups'); if (!box) return; box.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('on', b === btn)); box.querySelectorAll('.slipPane').forEach(p => { p.hidden = p.dataset.pane !== id; }); }
+function ciqSlipTab(btn, id) { state.pane = id; const box = btn.closest('.slipGroups'); if (!box) return; box.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('on', b === btn)); box.querySelectorAll('.slipPane').forEach(p => { p.hidden = p.dataset.pane !== id; }); }
 window.ciqSlipTab = ciqSlipTab;
 const fxDone = f => !!f && (!!f.result || !!f.graded || f.ts * 1000 + 125 * 60000 < Date.now());
 const catOf = (stat, group) => group === 'combo' ? 'combo' : group === '1x2' ? 'win' : group === 'dc' ? 'dc' : stat === 'c1' ? 'half' : stat === 'sh' ? 'sh' : stat === 'sot' ? 'sot' : stat === 'c' ? 'c' : 'g';
 const catOfKey = k => { const p = String(k || '').split('|'); return catOf(p[0], p[1]); };
 const BET_CATS = [['win', '🏆', 'מנצחת'], ['dc', '🛡', 'לא מפסידה'], ['g', '⚽', 'שערים'], ['c', '🚩', 'קרנות'], ['half', '⏱', 'מחציות'], ['sh', '🎯', 'בעיטות'], ['sot', '🥅', 'בעיטות למסגרת'], ['combo', '🔗', 'שילובים']];
-function slipsHtml(s, sp, cat, wantDone) {
-  if (!s || !s.k) return '';
+function slipsHtml(s, sp, cat, wantDone, extras) {
+  if (!s || !s.k) { if (!(extras && extras.length)) return ''; s = { k: {} }; }
+  const ex = id => (extras || []).find(e => e[0] === id);
   const keep = S => (!cat || S.legs.some(l => catOfKey(l.key) === cat)) && (!!(S.res === 'win' || S.res === 'lose') === !!wantDone);
   let cards = '', bet365 = false;
   for (const [lv, name, cls] of SLIP_LV) { const X = slipAt(s, lv, sp); if (X.legs.length && keep(X)) { cards += slipCardHtml(s, X, '📋 ' + name, lv === 'strong' ? 'שלושת ההימורים הכי חזקים' : 'חזק, אבל פחות מהחזק', cls); if (X.legs.some(l => l.src !== 'fivebet')) bet365 = true; } }
@@ -367,15 +368,19 @@ function slipsHtml(s, sp, cat, wantDone) {
   const grid = list => '<div class="slipGrid">' + list + '</div>';
   const panes = [];   // [מזהה, כפתור, הסבר קצר, תוכן]
   if (cards) panes.push(['top', '⭐ הכי חזקים', 'הטופס החזק והטופס השני של היום', grid(cards)]);
+  else if (extras && extras.length) panes.push(['top', '⭐ הכי חזקים', '', '<div class="empty">' + (wantDone ? 'עוד אין טפסים חזקים שנגמרו.' : 'הטפסים החזקים של היום כבר התחילו או נגמרו. אפשר לראות אותם תחת "נגמרו".') + '</div>', '']);
+  if (ex('rec')) panes.push(ex('rec'));
   if (fixed.length) panes.push(['fixed', '📌 קבועים', 'טפסים קבועים של שבת: משחקי אותה שעה באותה ליגה', grid(fixed.map(w => slipCardHtml(s, w, '📌 ' + w.label, 'ההימורים הכי חזקים משם', 'slip2')).join(''))]);
   if (wins.length) panes.push(['win', '⏱ לפי שעות', 'משחקים שמתחילים בטווח של עד שעה וחצי זה מזה', grid(wins.map(w => slipCardHtml(s, w, '⏱ ' + w.label, 'ההימורים הכי חזקים בטווח הזה', 'slip2')).join(''))]);
   if (leagueSl.length) panes.push(['lg', '🏟 לפי ליגה', 'טופס חזק לכל ליגה, מכל שעות המשחקים שלה באותו יום', grid(leagueSl.map(w => slipCardHtml(s, w, '🏟 ' + w.label, 'ההימורים הכי חזקים בליגה', '')).join(''))]);
+  if (ex('games')) panes.push(ex('games'));
   if (!panes.length) return '';
   if ([...wins, ...fixed, ...leagueSl].some(w => w.legs.some(l => l.src !== 'fivebet'))) bet365 = true;
+  const ini = Math.max(0, panes.findIndex(p => p[0] === state.pane));
   let html;
   if (panes.length === 1) html = panes[0][3];
-  else html = '<div class="slipGroups"><div class="segBar" role="tablist">' + panes.map((p, i) => '<button class="segBtn' + (i === 0 ? ' on' : '') + '" type="button" role="tab" onclick="ciqSlipTab(this,\'' + p[0] + '\')">' + p[1] + ' <span class="segN">' + (p[0] === 'top' ? '' : (p[0] === 'win' ? wins : p[0] === 'lg' ? leagueSl : fixed).length) + '</span></button>').join('') + '</div>' +
-    panes.map((p, i) => '<div class="slipPane" data-pane="' + p[0] + '"' + (i === 0 ? '' : ' hidden') + '><p class="sub2 paneHint">' + p[2] + '</p>' + p[3] + '</div>').join('') + '</div>';
+  else html = '<div class="slipGroups"><div class="segBar" role="tablist">' + panes.map((p, i) => '<button class="segBtn' + (i === ini ? ' on' : '') + '" type="button" role="tab" onclick="ciqSlipTab(this,\'' + p[0] + '\')">' + p[1] + ' <span class="segN">' + (p[4] != null ? p[4] : p[0] === 'top' ? '' : (p[0] === 'win' ? wins : p[0] === 'lg' ? leagueSl : fixed).length) + '</span></button>').join('') + '</div>' +
+    panes.map((p, i) => '<div class="slipPane" data-pane="' + p[0] + '"' + (i === ini ? '' : ' hidden') + '><p class="sub2 paneHint">' + p[2] + '</p>' + p[3] + '</div>').join('') + '</div>';
   return html + '<p class="muted note1">' + (bet365 ? 'טופס שמסומן Bet365 מחושב לפי יחסי Bet365: אפשר להקליד ליד כל הימור את היחס שרשום באתר שלך, והיחס הכולל יתעדכן. ' : '') + (s.final ? 'הטפסים נעולים ולא ישתנו היום.' : 'הטפסים עדיין לא נעולים.') + '</p>';
 }
 async function getBBDay(date) {
@@ -428,15 +433,19 @@ async function fillToday(date) {
   pSing += L.length ? (sp === 'f' ? groupByLg(L, 'first') : '<div class="srows">' + L.slice(0, LIM).map(x => bbSingleRow(date, x.g, x.m)).join('') + '</div>' + (L.length > LIM ? '<div class="more"><button class="btn" id="showAllPicks">הצג את כל ' + L.length + ' ההמלצות</button></div>' : '')) : '<div class="empty">אין היום המלצות בודדות ' + SP_IN[sp] + ' שעוברות את הרף.</div>';
   const modes = [['slips', '📋', 'טפסים'], ['singles', '🎯', 'המלצות'], ...(sp === 'f' ? [['games', '🗂', 'כל המשחקים']] : [])];
   if (!modes.some(m => m[0] === state.tmode)) state.tmode = 'slips';
-  html += '<div class="modeBar">' + modes.map(m => '<button class="modeBtn' + (m[0] === state.tmode ? ' on' : '') + '" data-tmode="' + m[0] + '"><span>' + m[1] + '</span>' + m[2] + '</button>').join('') + '</div>';
+  if (sp !== 'f') html += '<div class="modeBar">' + modes.map(m => '<button class="modeBtn' + (m[0] === state.tmode ? ' on' : '') + '" data-tmode="' + m[0] + '"><span>' + m[1] + '</span>' + m[2] + '</button>').join('') + '</div>';
   if (sp === 'f') html += '<div class="betBar"><span class="betLbl">סנן לפי סוג הימור</span><div class="chips"><button class="chip' + (cat ? '' : ' on') + '" data-betf="all">הכל</button>' + BET_CATS.filter(c => catCnt[c[0]] || c[0] === cat).map(c => '<button class="chip' + (cat === c[0] ? ' on' : '') + '" data-betf="' + c[0] + '">' + c[1] + ' ' + c[2] + ' <small>' + (catCnt[c[0]] || 0) + '</small></button>').join('') + '</div></div>';
-  const recRows = () => { const R = (state.recs || []).filter(r => r.odds >= 1.4 && (!cat || catOfKey(r.key) === cat)).map(r => ({ r, f: findFx(r.id) })).filter(x => x.f && fxDone(x.f) === wantDone); if (!R.length) return '<div class="empty">' + (wantDone ? 'אין עדיין המלצות מהסוג הזה שנגמרו.' : 'אין היום המלצות רלוונטיות מהסוג הזה.') + '</div>';
+  const recList = minSc => (state.recs || []).filter(r => r.odds >= 1.4 && (r.sc || 6) >= (minSc || 0) && (!cat || catOfKey(r.key) === cat)).map(r => ({ r, f: findFx(r.id) })).filter(x => x.f && fxDone(x.f) === wantDone);
+  const recRows = minSc => { const R = recList(minSc); if (!R.length) return '<div class="empty">' + (wantDone ? 'אין עדיין המלצות מהסוג הזה שנגמרו.' : 'אין היום המלצות רלוונטיות מהסוג הזה.') + '</div>';
     const by = new Map(); for (const x of R) (by.get(x.f.lg) || by.set(x.f.lg, []).get(x.f.lg)).push(x);
     const cc = BET_CATS.find(c => c[0] === cat) || ['', '⭐', 'כל הסוגים'], cn = cc[2];
-    return '<h3 class="secTitle">' + cc[1] + ' כל ההמלצות · ' + cn + ' <span class="muted">· ' + R.length + ' הימורים</span></h3><p class="srcNote">כל ההימורים מהסוג הזה שהמערכת ממליצה עליהם היום, עם יחס fivebet אמיתי. מהחזק לחלש בכל ליגה. לחיצה פותחת את המשחק.</p>' +
+    return '<h3 class="secTitle">' + cc[1] + ' ' + (minSc ? 'ההימורים החזקים להיום' : 'כל ההמלצות') + ' · ' + cn + ' <span class="muted">· ' + R.length + ' הימורים</span></h3><p class="srcNote">' + (minSc ? 'רק ציון ' + minSc + ' ומעלה לפי החישוב שלנו, עם יחס fivebet אמיתי.' : 'כל ההימורים שהמערכת ממליצה עליהם היום, עם יחס fivebet אמיתי.') + ' מהחזק לחלש בכל ליגה. לחיצה פותחת את המשחק.</p>' +
       [...by.entries()].sort((a, b) => Math.min(...a[1].map(x => x.f.ts)) - Math.min(...b[1].map(x => x.f.ts))).map(([lg, L], k) => '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(lg) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="srows">' + L.sort((a, b) => b.r.p - a.r.p).map(x => (() => { const mk = (x.f.markets || []).find(m => [m.stat, m.group, m.side, m.line].join('|') === x.r.key), rs = mk && mk.res ? RES[mk.res] : null; x.rs = rs; return ''; })() + '<div class="srow' + (x.rs ? ' fin-' + x.rs[1] : '') + '" onclick="openMatch(' + idxOf(x.f.id) + ')"><span class="score ' + scoreCls(x.r.sc) + '">' + x.r.sc + '</span><div class="smain"><div class="plabel">' + (x.rs ? x.rs[0].split(' ')[1] + ' ' : '') + (cat ? '' : ((BET_CATS.find(c => c[0] === catOfKey(x.r.key)) || [])[1] || '') + ' ') + esc(x.r.label) + '</div><div class="pmeta">' + bd(x.f.home.name) + ' – ' + bd(x.f.away.name) + ' · ' + fmtTime(x.f.ts) + '</div></div><div class="sside"><span class="oddsTag">fivebet <bdi dir="ltr">' + x.r.odds.toFixed(2) + '</bdi></span></div></div>').join('') + '</div></details>').join(''); };
   html += '<div class="statBar"><button class="chip' + (wantDone ? '' : ' on') + '" data-tstat="live">⏳ רלוונטיים</button><button class="chip' + (wantDone ? ' on' : '') + '" data-tstat="done">✅ נגמרו</button></div>';
-  html += state.tmode === 'slips' ? pSlips : (sp === 'f' && (cat || state.tmode === 'singles')) ? recRows() : state.tmode === 'singles' ? pSing : pGames;
+  if (sp === 'f') {
+    const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 כל המשחקים', 'ההמלצה הטובה ביותר לכל משחק', pGames || '<div class="empty">אין משחקים להצגה.</div>', '']];
+    html += slipsHtml(s, sp, cat, wantDone, extras) || '<div class="empty">אין כאן עדיין כלום.</div>';
+  } else html += state.tmode === 'slips' ? pSlips : pSing;
   box.innerHTML = html;
   box.querySelectorAll('[data-tstat]').forEach(b => b.onclick = () => { state.tstat = b.dataset.tstat; fillToday(date); });
   box.querySelectorAll('[data-tmode]').forEach(b => b.onclick = () => { state.tmode = b.dataset.tmode; fillToday(date); });
