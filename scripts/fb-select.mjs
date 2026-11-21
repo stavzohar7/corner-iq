@@ -186,7 +186,7 @@ function gameOptions(pool, min) {
     if (single) ch.push({ sc: single.pb, legs: [single], o: single.odds });
     let pair = null;
     for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j];
-      if (x.key === y.key || famKey(x) === famKey(y) || redundant(x, y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue;
+      if (x.key === y.key || ['sh', 'sot'].includes(x.stat) || ['sh', 'sot'].includes(y.stat) || famKey(x) === famKey(y) || redundant(x, y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue;
       const p = pairProb(x, y); if (p < PAIR_JOINT_MIN) continue; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
     if (pair) ch.push({ sc: Math.max(pair.legs[0].pb, pair.legs[1].pb) + 0.04, legs: pair.legs, o: pair.legs[0].odds * pair.legs[1].odds });
     if (ch.length) res.push({ best: Math.max(...ch.map(c => c.sc)), ch });
