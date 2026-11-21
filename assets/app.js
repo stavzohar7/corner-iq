@@ -64,7 +64,10 @@ const store = {
 try { Object.assign(state, JSON.parse(store.get(UIK) || '{}')); } catch (e) { /* ignore */ }
 const saveUi = () => store.set(UIK, JSON.stringify({ slipSp: state.slipSp, pane: state.pane, betf: state.betf, tstat: state.tstat, glg: state.glg }));
 
-async function getJson(url) { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(url); return r.json(); }
+async function getJson(url) {
+  const P = window.__pre && window.__pre[url]; if (P) { delete window.__pre[url]; return P; }
+  const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error(url); return r.json();
+}
 
 // ================= אתחול וניווט =================
 // ---- נגישות: גודל טקסט ומצב כהה/בהיר, נשמרים בין ביקורים ----
@@ -96,6 +99,7 @@ const GUIDE = '<details class="card guide"><summary>❓ איך קוראים את
   '<li><b>קרנות במחצית</b> = קרנות במחצית הראשונה בלבד.</li></ul></details>';
 async function init() {
   initA11y();
+  const pBb = getJson('data/bball/index.json').catch(() => null), pSl = loadSlips();
   try { state.index = await getJson('data/days/index.json'); }
   catch (e) { $('#view-today').innerHTML = '<div class="empty">עדיין אין נתונים. העדכון היומי הראשון ייצור אותם.</div>'; return; }
   const sel = $('#daySel');
@@ -104,8 +108,8 @@ async function init() {
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => goTab(b.dataset.tab));
   window.addEventListener('hashchange', route);
   // יום ברירת מחדל: היום החדש ביותר שיש בו המלצות (כדורגל או כדורסל). יום חדש שעוד אין לו יחסים לא מחליף את היום הקודם
-  try { bb.idx = await getJson('data/bball/index.json'); } catch (e) { bb.idx = { days: [], picksLog: [] }; }
-  await loadSlips();
+  bb.idx = (await pBb) || { days: [], picksLog: [] };
+  await pSl;
   const hasRecs = date => { const a = state.index.days.find(d => d.date === date), b = bb.idx.days.find(d => d.date === date); return (a && a.picks > 0) || (b && b.picks > 0); };
   const dates = [...new Set([...state.index.days.map(d => d.date), ...bb.idx.days.map(d => d.date)])].sort().reverse();
   const todayIl = ilToday(); state.defDate = (hasRecs(todayIl) && todayIl) || dates.slice().reverse().find(d => d > todayIl && hasRecs(d)) || dates.find(d => d <= todayIl && hasRecs(d)) || dates[0];
@@ -113,8 +117,9 @@ async function init() {
   if (first) { sel.value = first; await loadDay(first); }
 }
 async function loadDay(date) {
+  const pFb = getJson('data/fbodds/' + date + '.json').catch(() => null); try { getBBDay(date); } catch (e) { /* ignore */ }
   state.day = await getJson('data/days/' + date + '.json');
-  { let FB = null; state.recs = []; try { const fj = await getJson('data/fbodds/' + date + '.json'); FB = fj.odds || {}; state.recs = fj.recs || []; } catch (e) {}
+  { let FB = null; state.recs = []; try { const fj = await pFb; if (!fj) throw 0; FB = fj.odds || {}; state.recs = fj.recs || []; } catch (e) {}
     // יום שיש לו יחסי fivebet: מציגים רק הימורים שקיימים ב-fivebet עם יחס אמיתי. הימור בלי שוק שם לא מוצג בכלל (לא יחס משוער ולא Bet365)
     if (FB) {
       const idMap = new Map();
@@ -387,9 +392,9 @@ function slipsHtml(s, sp, cat, wantDone, extras) {
   return html + '<p class="muted note1">' + (bet365 ? 'טופס שמסומן Bet365 מחושב לפי יחסי Bet365: אפשר להקליד ליד כל הימור את היחס שרשום באתר שלך, והיחס הכולל יתעדכן. ' : '') + (s.final ? 'הטפסים נעולים ולא ישתנו היום.' : 'הטפסים עדיין לא נעולים.') + '</p>';
 }
 async function getBBDay(date) {
-  state.bbDays = state.bbDays || {};
-  if (!(date in state.bbDays)) { try { state.bbDays[date] = await getJson('data/bball/' + date + '.json'); } catch (e) { state.bbDays[date] = null; } }
-  return state.bbDays[date];
+  state.bbDays = state.bbDays || {}; state.bbP = state.bbP || {};
+  if (date in state.bbDays) return state.bbDays[date];
+  return state.bbP[date] || (state.bbP[date] = (async () => { try { state.bbDays[date] = await getJson('data/bball/' + date + '.json'); } catch (e) { state.bbDays[date] = null; } return state.bbDays[date]; })());
 }
 function bbSingleRow(date, g, m) {
   return '<div class="srow' + (m.res ? ' fin-' + BB_RES[m.res][1] : '') + '" onclick="openBB(\'' + date + '\',' + g.id + ')"><span class="score ' + scoreCls(m.score) + '" title="דירוג ' + m.score + ' מתוך 10">' + m.score + '</span><div class="smain"><div class="plabel">' + esc(m.label) + '</div><div class="pmeta">🏀 ' + bd(bbNm(g, 'h')) + ' – ' + bd(bbNm(g, 'a')) + ' · ' + bbComp(g.comp) + ' · ' + fmtTime(g.ts) + '</div>' + bbResStrip(g, m) + '</div><div class="sside">' + (m.odds ? bbOdds(m) : '') + '</div></div>';
