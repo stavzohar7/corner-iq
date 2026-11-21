@@ -934,13 +934,13 @@ function renderLeagueView(el) {
 const ilToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' });
 const addDays = (s, n) => { const d = new Date(s + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const weekStartOf = s => addDays(s, -new Date(s + 'T00:00:00Z').getUTCDay());
-const wkLabel = ws => fmtShort(ws) + '–' + fmtShort(addDays(ws, 6));
+const wkLabel = ws => ws === 'all' ? 'מאז שהתחלנו' : fmtShort(ws) + '–' + fmtShort(addDays(ws, 6));
 function weekList() {
   const ds = new Set([...(state.index.picksLog || []).map(e => e.d), ...((bb.idx && bb.idx.picksLog) || []).map(e => e.d), ...((state.slips && state.slips.days) || []).map(d => d.date)]);
   return [...new Set([...ds].map(weekStartOf))].sort().reverse();
 }
 function slipsOfWeek(ws) {
-  const out = [], end = addDays(ws, 6);
+  const out = [], end = ws === 'all' ? '9999-12-31' : addDays(ws, 6); if (ws === 'all') ws = '0000-00-00';
   for (const d of ((state.slips && state.slips.days) || []).filter(x => x.date >= ws && x.date <= end && x.k)) {
     for (const [lv, lvName] of SLIP_LV) for (const [sp, spName] of SLIP_SP) { const X = slipAt(d, lv, sp); if (X.legs.length) out.push({ d: d.date, lv, sp, name: lvName.replace('הטופס ', '') + ' · ' + spName, S: X }); }
     for (const w of (d.k.win || [])) if (w.legs.length) out.push({ d: d.date, lv: 'win', sp: 'f', name: 'לפי שעות · ⚽ כדורגל', S: w });
@@ -949,7 +949,7 @@ function slipsOfWeek(ws) {
   return out;
 }
 function weekHtml(ws, compact) {
-  const end = addDays(ws, 6), inW = d => d >= ws && d <= end, isW = r => r && r.includes('win'), isL = r => r && r.includes('lose');
+  const ALL = ws === 'all', end = ALL ? '9999-12-31' : addDays(ws, 6), inW = d => ALL || (d >= ws && d <= end), isW = r => r && r.includes('win'), isL = r => r && r.includes('lose');
   const F = (state.index.picksLog || []).filter(e => inW(e.d) && (isW(e.res) || isL(e.res)));
   const B = ((bb.idx && bb.idx.picksLog) || []).filter(e => inW(e.d) && (e.res === 'win' || e.res === 'lose'));
   const fw = F.filter(e => isW(e.res)).length, bw = B.filter(e => e.res === 'win').length;
@@ -958,7 +958,7 @@ function weekHtml(ws, compact) {
   const legs = SL.flatMap(x => x.S.legs).filter(l => l.res && l.res !== 'push'), legW = legs.filter(l => l.res === 'win').length;
   const money = done.reduce((t, x) => t + slipMoney(x.S), 0), of = (w, n) => n ? w + ' מתוך ' + n : '—';
   const kpi = (v, t, cls) => '<div class="kpi"><b' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</b><span>' + t + '</span></div>';
-  let html = '<div class="card wkCard"><h4>📅 סיכום שבועי · ' + wkLabel(ws) + (ws === weekStartOf(ilToday()) ? ' <span class="muted">(השבוע, עד עכשיו)</span>' : '') + '</h4>' +
+  let html = '<div class="card wkCard"><h4>' + (ALL ? '📅 סיכום כולל · ' : '📅 סיכום שבועי · ') + wkLabel(ws) + (ws === weekStartOf(ilToday()) ? ' <span class="muted">(השבוע, עד עכשיו)</span>' : '') + '</h4>' +
     '<div class="kpis">' + kpi(of(fw, F.length), '⚽ המלצות כדורגל שנתפסו') + kpi(of(bw, B.length), '🏀 המלצות כדורסל שנתפסו') + kpi(of(strongW, strongDone.length), '📋 טפסים חזקים שנתפסו') + kpi(of(sw, done.length), '📋 כל הטפסים שנתפסו') + kpi(of(legW, legs.length), '🎯 רגליים בטפסים שעברו') + kpi(done.length ? fmtMoney(money) : '—', '💰 מאזן טפסים (100 ₪ לטופס)', done.length ? moneyCls(money) : '') + '</div>';
   if (F.length + B.length + done.length) html += '<p class="wkNote">' + (F.length + B.length ? 'הימורים בודדים עברו ' + (fw + bw) + ' מתוך ' + (F.length + B.length) + '. ' : '') + (legs.length ? 'רגליים בתוך טפסים עברו ' + legW + ' מתוך ' + legs.length + ', אבל טופס נתפס רק כששלוש הרגליים עוברות יחד, ולכן הטפסים נתפסו ' + of(sw, done.length) + '. ' : '') + 'זה לא טעות בחישוב: ככל שיש יותר רגליים בטופס, כך קשה יותר לתפוס אותו.</p>';
   else html += '<p class="muted">עוד אין תוצאות שנגמרו בשבוע הזה.</p>';
@@ -970,7 +970,7 @@ function weekHtml(ws, compact) {
   if (done.length) {
     const g2 = {}; done.forEach(x => { const b = g2[x.name] ||= { n: 0, w: 0, legs: 0, lw: 0, m: 0 }; b.n++; if (x.S.res === 'win') b.w++; b.m += slipMoney(x.S); x.S.legs.filter(l => l.res && l.res !== 'push').forEach(l => { b.legs++; if (l.res === 'win') b.lw++; }); });
     html += '<h4 class="secSub">📋 הטפסים לפי סוג</h4><div class="tblWrap"><table><thead><tr><th>טופס</th><th class="num">נתפסו</th><th class="num">מתוך</th><th class="num">רגליים שעברו</th><th class="num">מאזן</th></tr></thead><tbody>' + Object.entries(g2).map(([k, b]) => '<tr><td>' + k + '</td><td class="num"><b>' + b.w + '</b></td><td class="num">' + b.n + '</td><td class="num">' + b.lw + ' מתוך ' + b.legs + '</td><td class="num"><b class="' + moneyCls(b.m) + '">' + fmtMoney(b.m) + '</b></td></tr>').join('') + '</tbody></table></div>';
-    html += '<h4 class="secSub">📋 כל טפסי השבוע</h4><div class="tblWrap"><table><thead><tr><th>יום</th><th>טופס</th><th>ההימורים</th><th class="num">יחס</th><th class="num">מצב</th></tr></thead><tbody>' + SL.sort((a, b) => b.d.localeCompare(a.d)).map(x => '<tr><td>' + fmtShort(x.d) + '</td><td>' + x.name + '</td><td>' + x.S.legs.map(l => (l.res === 'win' ? '✅ ' : l.res === 'lose' ? '❌ ' : l.res === 'push' ? '↩ ' : '⏳ ') + esc(l.label)).join('<br>') + '</td><td class="num">' + x.S.total.toFixed(2) + '</td><td class="num">' + (x.S.res === 'win' ? 'נתפס ✅' : x.S.res === 'lose' ? 'נפל ❌' : '⏳') + '</td></tr>').join('') + '</tbody></table></div>';
+    html += '<h4 class="secSub">📋 כל הטפסים</h4><div class="tblWrap"><table><thead><tr><th>יום</th><th>טופס</th><th>ההימורים</th><th class="num">יחס</th><th class="num">מצב</th></tr></thead><tbody>' + SL.sort((a, b) => b.d.localeCompare(a.d)).map(x => '<tr><td>' + fmtShort(x.d) + '</td><td>' + x.name + '</td><td>' + x.S.legs.map(l => (l.res === 'win' ? '✅ ' : l.res === 'lose' ? '❌ ' : l.res === 'push' ? '↩ ' : '⏳ ') + esc(l.label)).join('<br>') + '</td><td class="num">' + x.S.total.toFixed(2) + '</td><td class="num">' + (x.S.res === 'win' ? 'נתפס ✅' : x.S.res === 'lose' ? 'נפל ❌' : '⏳') + '</td></tr>').join('') + '</tbody></table></div>';
   }
   return html + '</div>';
 }
@@ -978,8 +978,8 @@ const trTab = () => state.trSub || 'slips', hid = k => trTab() === k ? '' : ' hi
 const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['learn', '🧠 מה למדנו'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
 function weekPanel() {
   const wl = weekList(); if (!wl.length) return '<div class="empty">עוד אין נתונים לסיכום.</div>';
-  const cur = state.wk && wl.includes(state.wk) ? state.wk : wl[0];
-  return '<div class="chips" style="margin-bottom:10px">' + wl.map(w => '<button class="chip' + (w === cur ? ' on' : '') + '" data-wk="' + w + '">' + wkLabel(w) + '</button>').join('') + '</div>' + weekHtml(cur, false);
+  const cur = state.wk === 'all' || (state.wk && wl.includes(state.wk)) ? state.wk : wl[0];
+  return '<div class="chips" style="margin-bottom:10px">' + ['all', ...wl].map(w => '<button class="chip' + (w === cur ? ' on' : '') + '" data-wk="' + w + '">' + wkLabel(w) + '</button>').join('') + '</div>' + weekHtml(cur, false);
 }
 // ---- סטטיסטיקה לפי ליגה: בטופס החזק / בטפסים אחרים / בהמלצות בודדות שלא נכנסו לטופס ----
 function leagueSplit() {
