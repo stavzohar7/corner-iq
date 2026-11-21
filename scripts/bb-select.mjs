@@ -91,7 +91,7 @@ for (const G of site.games) {
   }
   try { extCands({ g, G, e, nba, hN, aN, PL: PLB, add, logs: LOGS }); } catch (err) { console.error('ext', name, err.message); }
 }
-const ok = c => c.tier === 'prop' ? (c.pb >= 0.64 && c.gap <= 0.18) : (c.pb >= 0.58 && c.gap <= 0.25);
+const ok = c => c.tier === 'prop' ? (c.pb >= 0.6 && c.gap <= 0.2) : (c.pb >= 0.58 && c.gap <= 0.25);
 for (const c of cands) c.rk = c.pb - (c.tier === 'prop' ? 0.04 : 0);   // שווקים חדשים שעוד לא נבדקו: מדורגים נמוך יותר, כך שהימור מאומת בשווי דומה קודם
 const pool = cands.filter(ok).sort((a, b) => b.rk - a.rk);
 if (process.env.BB_DEBUG) for (const c of cands.filter(c => c.tier === 'prop').sort((a, b) => b.pb - a.pb)) console.log((ok(c) ? 'OK ' : '-- ') + c.pb.toFixed(2) + ' @' + c.odds + ' (מודל ' + c.pm + ', אתר ' + c.ps + ') ' + c.label + ' [' + c.key + ']');
@@ -111,7 +111,7 @@ function pickBB(T, exclGames) {
   for (const L of byGame.values()) {
     L.sort((x, y) => y.rk - x.rk);
     let pair = null;
-    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j]; if (!okPair(x, y) || Math.min(x.pb, y.pb) < PAIR_MIN || x.odds * y.odds < 1.8) continue; const p = x.pb * y.pb; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
+    for (let i = 0; i < L.length; i++) for (let j = i + 1; j < L.length; j++) { const x = L[i], y = L[j]; if (!okPair(x, y) || Math.min(x.pb, y.pb) < (x.tier === 'prop' || y.tier === 'prop' ? 0.6 : PAIR_MIN) || x.odds * y.odds < 1.8) continue; const p = x.pb * y.pb; if (!pair || p > pair.p) pair = { p, legs: [x, y] }; }
     const single = L.find(c => c.odds >= 1.4);
     if (pair && (!single || pair.p >= single.pb * 0.62)) opts.push({ sc: Math.max(pair.legs[0].rk, pair.legs[1].rk) + 0.04, id: L[0].game.id, legs: pair.legs });
     else if (single) opts.push({ sc: single.rk, id: single.game.id, legs: [single] });

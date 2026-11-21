@@ -56,6 +56,7 @@ export function extCands(ctx) {
     const raw = []; for (let i = 0; i < 4; i++) raw.push({ tot: (m(qHL, i, 0) + m(qAL, i, 1)) / 2 + (m(qAL, i, 0) + m(qHL, i, 1)) / 2, mar: (m(qHL, i, 0) + m(qAL, i, 1)) / 2 - (m(qAL, i, 0) + m(qHL, i, 1)) / 2 });
     const rawTot = raw.reduce((s, x) => s + x.tot, 0), k = e.total / rawTot;
     for (const [pk, P] of Object.entries(LQ)) {
+      if (pk !== 'q1' && pk !== 'h1') continue;   // לפי בקשת המשתמש: רק רבע ראשון או מחצית ראשונה (לא רבע שני, שלישי, רביעי או מחצית שנייה)
       const idx = P.idx, mu = idx.reduce((s, i) => s + raw[i].tot * k, 0), frac = idx.length / 4;
       const muM = 0.5 * idx.reduce((s, i) => s + raw[i].mar, 0) + 0.5 * e.margin * frac, sdT = (P.sd || 8) * 0.95, sdM = (P.msd || 6) * 0.95;
       const X = ext[pk]; if (!X) continue;
