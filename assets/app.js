@@ -56,10 +56,13 @@ const state = { index: null, day: null, tab: 'today', q: '', sf: 'all', tday: 'a
 
 // ---- אחסון מקומי (עם גיבוי בזיכרון אם הדפדפן חוסם) ----
 const mem = {};
+const UIK = 'ciqui';
 const store = {
   get(k) { try { const v = localStorage.getItem(k); return v == null ? (mem[k] ?? null) : v; } catch (e) { return mem[k] ?? null; } },
   set(k, v) { mem[k] = v; try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } },
 };
+try { Object.assign(state, JSON.parse(store.get(UIK) || '{}')); } catch (e) { /* ignore */ }
+const saveUi = () => store.set(UIK, JSON.stringify({ slipSp: state.slipSp, pane: state.pane, betf: state.betf, tstat: state.tstat, glg: state.glg }));
 
 async function getJson(url) { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(url); return r.json(); }
 
@@ -130,7 +133,7 @@ async function loadDay(date) {
   const d = state.day;
   $('#updated').textContent = 'עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt });
   { const ageH = (Date.now() - new Date(d.updated).getTime()) / 3600e3, isToday = date >= ilToday(), stale = isToday && ageH > 3 ? '<div class="banner warnB">⚠️ הנתונים עודכנו לפני ' + (ageH < 24 ? Math.round(ageH) + ' שעות' : Math.round(ageH / 24) + ' ימים') + '. ייתכן שחלק מהתוצאות וההרכבים לא מעודכנים. העדכון האוטומטי רץ כל שעה, ואם הוא נתקע זה יתוקן בהרצה הבאה.</div>' : '';
-    $('#banners').innerHTML = stale + (d.notes || []).map(n => String(n).length > 90 ? '<details class="banner"><summary>' + (String(n).includes('מושעה') ? '⚠️ יחסי Bet365 לא מתעדכנים כרגע' : esc(String(n).slice(0, 48)) + '…') + ' <b>לפרטים</b></summary><p>' + esc(n) + '</p></details>' : '<div class="banner">' + esc(n) + '</div>').join(''); }
+    $('#banners').innerHTML = stale + (d.notes || []).filter(n => !/Bet365|מושעה/.test(String(n))).map(n => String(n).length > 90 ? '<details class="banner"><summary>' + (String(n).includes('מושעה') ? '⚠️ יחסי Bet365 לא מתעדכנים כרגע' : esc(String(n).slice(0, 48)) + '…') + ' <b>לפרטים</b></summary><p>' + esc(n) + '</p></details>' : '<div class="banner">' + esc(n) + '</div>').join(''); }
   const mt = d.meta || {};
   $('#srcLine').textContent = mt.fd ? 'מקורות: football-data.co.uk (' + mt.fd + ' משחקי עונה) · 365Scores (' + mt.s365 + ' משחקים, מהם ' + mt.h1 + ' עם נתוני מחצית) · התאמה בין המקורות בקרנות: ' + mt.same + ' מתוך ' + mt.checked : '';
   { const sl = $('#srcLine'); sl.textContent = '🕒 עודכן: ' + new Date(d.updated).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short', ...tzOpt }) + (sl.textContent ? ' · ' + sl.textContent : ''); }
@@ -352,7 +355,7 @@ function slipCardHtml(d, S, title, sub, cls) {
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
     '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : S.legs.every(l => l.est) ? 'משוער' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div>' + (S.res ? '<p class="muted slipFoot">' + (S.res === 'win' ? '<b class="pos">נתפס ✅</b>' : S.res === 'lose' ? '<b class="neg">נפל ❌</b>' : '') + '</p>' : '') + '</div>';
 }
-function ciqSlipTab(btn, id) { state.pane = id; const box = btn.closest('.slipGroups'); if (!box) return; box.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('on', b === btn)); box.querySelectorAll('.slipPane').forEach(p => { p.hidden = p.dataset.pane !== id; }); }
+function ciqSlipTab(btn, id) { state.pane = id; saveUi(); const box = btn.closest('.slipGroups'); if (!box) return; box.querySelectorAll('.segBtn').forEach(b => b.classList.toggle('on', b === btn)); box.querySelectorAll('.slipPane').forEach(p => { p.hidden = p.dataset.pane !== id; }); }
 window.ciqSlipTab = ciqSlipTab;
 const fxDone = f => !!f && (!!f.result || !!f.graded || f.ts * 1000 + 125 * 60000 < Date.now());
 const catOf = (stat, group) => group === 'combo' ? 'combo' : group === '1x2' ? 'win' : group === 'dc' ? 'dc' : stat === 'c1' ? 'half' : stat === 'sh' ? 'sh' : stat === 'sot' ? 'sot' : stat === 'c' ? 'c' : 'g';
@@ -376,7 +379,7 @@ function slipsHtml(s, sp, cat, wantDone, extras) {
   if (ex('games')) panes.push(ex('games'));
   if (!panes.length) return '';
   if ([...wins, ...fixed, ...leagueSl].some(w => w.legs.some(l => l.src !== 'fivebet'))) bet365 = true;
-  const ini = Math.max(0, panes.findIndex(p => p[0] === state.pane));
+  let ini = panes.findIndex(p => p[0] === state.pane); if (ini < 0) ini = Math.max(0, panes.findIndex(p => !(p[0] === 'top' && /class="empty"/.test(p[3]))));
   let html;
   if (panes.length === 1) html = panes[0][3];
   else html = '<div class="slipGroups"><div class="segBar" role="tablist">' + panes.map((p, i) => '<button class="segBtn' + (i === ini ? ' on' : '') + '" type="button" role="tab" onclick="ciqSlipTab(this,\'' + p[0] + '\')">' + p[1] + ' <span class="segN">' + (p[4] != null ? p[4] : p[0] === 'top' ? '' : (p[0] === 'win' ? wins : p[0] === 'lg' ? leagueSl : fixed).length) + '</span></button>').join('') + '</div>' +
@@ -452,7 +455,7 @@ async function fillToday(date) {
     const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 כל המשחקים', 'כל משחקי היום לפי ליגה ושעה, כמו באפליקציית תוצאות. לחיצה על משחק פותחת ניתוח מלא.', gamesPaneHtml(cat), state.day.fixtures.length]];
     html += slipsHtml(s, sp, cat, wantDone, extras) || '<div class="empty">אין כאן עדיין כלום.</div>';
   } else html += state.tmode === 'slips' ? pSlips : pSing;
-  box.innerHTML = html;
+  box.innerHTML = html; saveUi();
   box.querySelectorAll('[data-fopen]').forEach(b => b.onclick = () => { state.fopen = !state.fopen; fillToday(date); });
   box.querySelectorAll('[data-tstat]').forEach(b => b.onclick = () => { state.tstat = b.dataset.tstat; fillToday(date); });
   box.querySelectorAll('[data-tmode]').forEach(b => b.onclick = () => { state.tmode = b.dataset.tmode; fillToday(date); });
