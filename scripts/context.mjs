@@ -26,6 +26,7 @@ const ALIAS = {
   'club brugge': 'club brugge', 'royal antwerp': 'antwerp', 'union saint gilloise': 'st gilloise', 'union st gilloise': 'st gilloise',
   'olympiacos': 'olympiakos', 'olympiakos piraeus': 'olympiakos', 'paok': 'paok', 'aek athens': 'aek', 'panathinaikos': 'panathinaikos',
   'galatasaray': 'galatasaray', 'fenerbahce': 'fenerbahce', 'besiktas': 'besiktas', 'celtic': 'celtic', 'rangers': 'rangers',
+  'wolverhampton wandearers': 'wolves', 'swansea city': 'swansea', 'west bromwich': 'west brom', 'west ham utd': 'west ham', 'wolverhampton wanderers': 'wolves',
   'maccabi tel aviv': 'maccabi tel aviv', 'hapoel beer sheva': 'hapoel beer sheva', 'maccabi haifa': 'maccabi haifa',
 };
 
