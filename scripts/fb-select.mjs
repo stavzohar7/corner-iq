@@ -54,7 +54,7 @@ const hn = f => clean(f.home.name), an = f => clean(f.away.name);
 const STAT_HE = { g: 'שערים', c: 'קרנות', c1: 'קרנות במחצית הראשונה', sh: 'בעיטות', sot: 'בעיטות למסגרת' };
 const fbAll = {};   // כל יחסי fivebet שנקראו (כל השוקים, בלי סינון), לתצוגה באתר
 for (const { G, f } of matched) {
-  if (f.ts * 1000 < Date.now() + 10 * 60e3 || !f.exp) continue;
+  if ((!process.env.RECS_ALL && f.ts * 1000 < Date.now() + 10 * 60e3) || !f.exp) continue;
   const E = f.exp, dist = {}; for (const st of ['g', 'c', 'c1', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
   const LGA = Object.fromEntries(["g", "c", "c1", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
   const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); 
@@ -238,8 +238,9 @@ fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.
   for (const [id, O] of Object.entries(fbAll)) old[id] = { ...(old[id] || {}), ...O };
   let oldRecs = []; try { oldRecs = readJson(file).recs || []; } catch (e) {}
   const startedIds = new Set(matched.filter(m => m.f.ts * 1000 <= Date.now()).map(m => String(m.f.id))), freshIds = new Set(cands.map(gid));
-  const seenR = new Set(), recs = cands.filter(c => c.pb >= 0.6 && c.odds >= 1.4 && c.pb * c.odds - 1 >= EV_MIN && !startedIds.has(gid(c))).sort((x, y) => y.pb - x.pb).filter(c => { const k = gid(c) + '|' + c.key; if (seenR.has(k)) return false; seenR.add(k); return true; })
-    .filter((c, i, arr) => arr.slice(0, i).filter(y => gid(y) === gid(c)).length < 2).slice(0, 60).map(c => ({ id: c.f.id, key: c.key, label: c.label, odds: c.odds, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), sc: c.pb >= 0.64 ? 7 : 6 }));
+  const seenR = new Set(), recs = cands.filter(c => c.pb >= 0.6 && c.odds >= 1.4 && c.pb * c.odds - 1 >= EV_MIN).sort((x, y) => y.pb - x.pb).filter(c => { const k = gid(c) + '|' + c.key; if (seenR.has(k)) return false; seenR.add(k); return true; })
+    .filter((c, i, arr) => arr.slice(0, i).filter(y => gid(y) === gid(c)).length < 2).map(c => ({ id: c.f.id, key: c.key, label: c.label, odds: c.odds, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), sc: c.pb >= 0.64 ? 7 : 6 }));
+  { let up = 0; for (let i = 0; i < recs.length; i++) { if (startedIds.has(String(recs[i].id))) continue; if (++up > 60) { recs.splice(i, 1); i--; } } }
   // המלצות של משחקים שכבר התחילו או נגמרו נשארות כמו שהיו, לא נמחקות
   for (const r of oldRecs) if (!freshIds.has(String(r.id)) || startedIds.has(String(r.id))) { const k = r.id + '|' + r.key; if (!seenR.has(k)) { seenR.add(k); recs.push(r); } }
   fs.writeFileSync(file, JSON.stringify({ updated: new Date().toISOString(), odds: old, recs })); }
