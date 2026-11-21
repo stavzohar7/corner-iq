@@ -87,6 +87,11 @@ const GUIDE = '<details class="card guide"><summary>❓ איך קוראים את
   '<li><b>הציון (1 עד 10)</b> = כמה ההימור חזק לפי הניתוח שלנו. <span class="score s-hi">7</span> ומעלה חזק, <span class="score s-mid">5-6</span> בינוני, מתחת לזה חלש.</li>' +
   '<li><b>הטופס החזק</b> = שלושת ההימורים הכי בטוחים של היום, בשלושה משחקים שונים. הוא נפסל אם הימור אחד נופל. <b>הטופס השני</b> = חזק פחות, אבל יחס גבוה יותר.</li>' +
   '<li><b>המלצה בודדת</b> = הימור אחד על משחק אחד, לא קשור לטפסים.</li>' +
+  '<li><b>איך המערכת מחליטה (בקצרה):</b> קוראים מ-fivebet את היחס של כל הימור. אחר כך מעריכים כמה סביר שהוא יעבור בשלוש דרכים: (1) מודל שמחשב כמה שערים, קרנות ובעיטות צפויים לפי הממוצעים של שתי הקבוצות, (2) מה שהיחס של האתר עצמו מרמז, (3) תיקון לפי סגנון המשחק של הקבוצות ולפי כמה פגענו בעבר בסוג כזה של הימור. מהשלושה יוצא סיכוי אחד לכל הימור.</li>' +
+  '<li><b>מתי הימור נכנס:</b> רק אם הסיכוי שלו גבוה, והיחס משתלם (הסיכוי כפול היחס גבוה מ-1), והיחס לפחות 1.4. אם יש שני הימורים באותו משחק הם משולבים בשורה אחת, והיחס שלהם יחד לפחות 1.8.</li>' +
+  '<li><b>הציון:</b> 7 = הסיכוי גבוה במיוחד. 6 = טוב. זה הסדר שבו ההימורים מופיעים.</li>' +
+  '<li><b>טופס:</b> היחס הכולל הוא כפל של כל היחסים בו, ואנחנו שואפים ל-3.5 עד 5. טופס נתפס רק אם כל ההימורים בו עוברים, ולכן הוא נתפס פחות מהימור בודד.</li>' +
+  '<li><b>למה לפעמים נופל:</b> אלה הערכות, לא ודאות. גם הימור שנראה כמעט בטוח נופל מדי פעם, וזה בדיוק מה שהמעקב מראה.</li>' +
   '<li><b>הסימנים:</b> ✅ נתפס · ❌ נפל · ⏳ עדיין לא נגמר · ↩ הוחזר.</li>' +
   '<li><b>"x מתוך y"</b> = כמה נתפסו מתוך אלה שכבר נגמרו.</li>' +
   '<li><b>יחס</b> = כמה משלמים על כל שקל. יחס Bet365 הוא לעיון, תבדוק תמיד את היחס באתר שלך.</li></ul>' +
@@ -241,14 +246,17 @@ function nextKickoff(date) {
   return '<p class="nextKo">⏱ <b>המשחק הבא:</b> ' + bd(up.home.name) + ' – ' + bd(up.away.name) + ' · ' + fmtTime(up.ts) + ' (' + when + ')</p>';
 }
 function daySummary(date) {
-  const st = slipDayStat(date), L = (state.index.matchLog || []).filter(e => e.d === date), done = L.filter(e => e.res), w = done.filter(e => e.res.includes('win')).length, l = done.filter(e => e.res.includes('lose')).length;
-  if (!st && !L.length) return '';
-  const cell = (t, a, b) => '<div class="kpi"><b>' + a + '</b><span>' + t + (b ? '<br><small>' + b + '</small>' : '') + '</span></div>';
-  return '<div class="card daySum"><h4>📌 סיכום ' + dayName(date) + ' <span class="muted">' + fmtShort(date) + '</span></h4><div class="kpis">' +
-    (st ? cell('טפסים', st.w + ' מתוך ' + st.n, st.w + st.l < st.n ? (st.n - st.w - st.l) + ' עוד ממתינים' : 'כולם נגמרו') : '') +
-    (L.length ? cell('המלצות בודדות', w + ' מתוך ' + (w + l), L.length - done.length ? (L.length - done.length) + ' עוד ממתינות' : 'כולן נגמרו') : '') + '</div>' + streakLine() + nextKickoff(date) + '</div>';
+  const st = slipDayStat(date);
+  // הימורים בודדים: אותם הימורים שמוצגים בכרטיסייה "הימורים להיום" (ציון 7 ומעלה), נבדקים מול התוצאה בפועל
+  let sw = 0, sl = 0, sp = 0, spend = 0;
+  if (state.day && state.day.date === date) for (const r of (state.recs || [])) { if (r.odds < 1.4 || (r.sc || 6) < 7) continue; const f = findFx(r.id); if (!f) continue; const x = fxDone(f) ? recRes(r, f) : null; if (x === 'win') sw++; else if (x === 'lose') sl++; else if (x === 'push') sp++; else spend++; }
+  if (!st && !(sw + sl + sp + spend)) return '';
+  const blk = (ic, title, w, l, p, note) => { const n = w + l; return '<div class="sumBlk"><div class="sumT">' + ic + ' ' + title + '</div><div class="sumRow"><span class="sumW"><b>' + w + '</b> נתפסו</span><span class="sumL"><b>' + l + '</b> נפלו</span><span class="sumP"><b>' + p + '</b> ממתינים</span></div>' +
+    '<div class="sumBar" title="' + w + ' מתוך ' + n + ' שנגמרו"><i style="width:' + (n ? Math.round(100 * w / n) : 0) + '%"></i></div><div class="sumNote">' + (n ? 'מתוך ' + n + ' שנגמרו, ' + w + ' עברו' : 'עוד לא נגמר אף אחד') + (note ? ' · ' + note : '') + '</div></div>'; };
+  return '<div class="card daySum"><h4>📌 איך היום הולך <span class="muted">' + fmtShort(date) + '</span> <a class="linkBtn" href="#guide" onclick="var g=document.querySelector(\'.guide\');if(g){g.open=true;g.scrollIntoView()}return false">איך זה עובד?</a></h4><div class="sumGrid">' +
+    (st ? blk('📋', 'טפסים', st.w, st.l, st.n - st.w - st.l, 'טופס נתפס רק אם כל ההימורים בו עברו') : '') +
+    ((sw + sl + sp + spend) ? blk('🎯', 'הימורים בודדים (ציון 7 ומעלה)', sw, sl, spend + sp, '') : '') + '</div>' + nextKickoff(date) + '</div>';
 }
-// סיכום "מה קרה ביום האחרון שנגמר": כל טופס ואיך הוא יצא
 function recapHtml(date) {
   const S = state.slips; if (!S) return '';
   const d = S.days.filter(x => x.date < date && x.k && slipDayStat(x.date)).sort((x, y) => y.date.localeCompare(x.date))[0]; if (!d) return '';
