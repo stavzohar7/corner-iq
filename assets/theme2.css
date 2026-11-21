@@ -258,3 +258,5 @@ details.banner summary { cursor: pointer; font-weight: 600; list-style: none; } 
 .ourBets .obTop { display: flex; align-items: center; gap: 10px; } .ourBets .obLbl { flex: 1; font-size: 16px; }
 .ourBets .obWhy { margin: 6px 0 0; color: var(--text-2); font-size: 14px; line-height: 1.6; }
 .ourBets .ob.fin-win .obLbl { color: var(--good); } .ourBets .ob.fin-lose .obLbl { color: var(--bad); }
+
+.gmPick.fin-win { border-color: rgba(47,227,155,.6); background: rgba(47,227,155,.14); } .gmPick.fin-lose { border-color: rgba(255,111,111,.6); background: rgba(255,111,111,.12); }

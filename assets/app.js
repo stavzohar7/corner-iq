@@ -361,9 +361,9 @@ const BET_CATS = [['win', '🏆', 'מנצחת'], ['dc', '🛡', 'לא מפסיד
 function slipsHtml(s, sp, cat, wantDone, extras) {
   if (!s || !s.k) { if (!(extras && extras.length)) return ''; s = { k: {} }; }
   const ex = id => (extras || []).find(e => e[0] === id);
-  const keep = S => (!cat || S.legs.some(l => catOfKey(l.key) === cat)) && (!!(S.res === 'win' || S.res === 'lose') === !!wantDone);
+  const keepTop = S => !cat || S.legs.some(l => catOfKey(l.key) === cat), keep = S => keepTop(S) && (!!(S.res === 'win' || S.res === 'lose') === !!wantDone);
   let cards = '', bet365 = false;
-  for (const [lv, name, cls] of SLIP_LV) { const X = slipAt(s, lv, sp); if (X.legs.length && keep(X)) { cards += slipCardHtml(s, X, '📋 ' + name, lv === 'strong' ? 'שלושת ההימורים הכי חזקים' : 'חזק, אבל פחות מהחזק', cls); if (X.legs.some(l => l.src !== 'fivebet')) bet365 = true; } }
+  for (const [lv, name, cls] of SLIP_LV) { const X = slipAt(s, lv, sp); if (X.legs.length && keepTop(X)) { cards += slipCardHtml(s, X, '📋 ' + name, lv === 'strong' ? 'שלושת ההימורים הכי חזקים' : 'חזק, אבל פחות מהחזק', cls); if (X.legs.some(l => l.src !== 'fivebet')) bet365 = true; } }
   const wins = sp === 'f' ? (s.k.win || []).filter(w => w.legs.length && keep(w)) : [], fixedAll = sp === 'f' ? (s.k.lg || []).filter(w => w.legs.length && keep(w)) : [], fixed = fixedAll.filter(w => w.kind !== 'league'), leagueSl = fixedAll.filter(w => w.kind === 'league');
   const grid = list => '<div class="slipGrid">' + list + '</div>';
   const panes = [];   // [מזהה, כפתור, הסבר קצר, תוכן]
@@ -440,7 +440,7 @@ async function fillToday(date) {
     const by = new Map(); for (const x of R) (by.get(x.f.lg) || by.set(x.f.lg, []).get(x.f.lg)).push(x);
     const cc = BET_CATS.find(c => c[0] === cat) || ['', '⭐', 'כל הסוגים'], cn = cc[2];
     return '<h3 class="secTitle">' + cc[1] + ' ' + (minSc ? 'ההימורים החזקים להיום' : 'כל ההמלצות') + ' · ' + cn + ' <span class="muted">· ' + R.length + ' הימורים</span></h3><p class="srcNote">' + (minSc ? 'רק ציון ' + minSc + ' ומעלה לפי החישוב שלנו, עם יחס fivebet אמיתי.' : 'כל ההימורים שהמערכת ממליצה עליהם היום, עם יחס fivebet אמיתי.') + ' מהחזק לחלש בכל ליגה. לחיצה פותחת את המשחק.</p>' +
-      [...by.entries()].sort((a, b) => Math.min(...a[1].map(x => x.f.ts)) - Math.min(...b[1].map(x => x.f.ts))).map(([lg, L], k) => '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(lg) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="srows">' + L.sort((a, b) => b.r.p - a.r.p).map(x => (() => { const mk = (x.f.markets || []).find(m => [m.stat, m.group, m.side, m.line].join('|') === x.r.key), rs = mk && mk.res ? RES[mk.res] : null; x.rs = rs; return ''; })() + '<div class="srow' + (x.rs ? ' fin-' + x.rs[1] : '') + '" onclick="openMatch(' + idxOf(x.f.id) + ')"><span class="score ' + scoreCls(x.r.sc) + '">' + x.r.sc + '</span><div class="smain"><div class="plabel">' + (x.rs ? x.rs[0].split(' ')[1] + ' ' : '') + (cat ? '' : ((BET_CATS.find(c => c[0] === catOfKey(x.r.key)) || [])[1] || '') + ' ') + esc(x.r.label) + '</div><div class="pmeta">' + bd(x.f.home.name) + ' – ' + bd(x.f.away.name) + ' · ' + fmtTime(x.f.ts) + '</div></div><div class="sside"><span class="oddsTag">fivebet <bdi dir="ltr">' + x.r.odds.toFixed(2) + '</bdi></span></div></div>').join('') + '</div></details>').join(''); };
+      [...by.entries()].sort((a, b) => Math.min(...a[1].map(x => x.f.ts)) - Math.min(...b[1].map(x => x.f.ts))).map(([lg, L], k) => '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(lg) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="srows">' + L.sort((a, b) => b.r.p - a.r.p).map(x => (() => { x.rr = recRes(x.r, x.f); return ''; })() + '<div class="srow' + (x.rr ? ' fin-' + (x.rr === 'win' ? 'win' : x.rr === 'lose' ? 'lose' : 'push') : '') + '" onclick="openMatch(' + idxOf(x.f.id) + ')"><span class="score ' + scoreCls(x.r.sc) + '">' + x.r.sc + '</span><div class="smain"><div class="plabel">' + (x.rr ? RIC[x.rr] + ' ' : '') + (cat ? '' : ((BET_CATS.find(c => c[0] === catOfKey(x.r.key)) || [])[1] || '') + ' ') + esc(x.r.label) + '</div><div class="pmeta">' + bd(x.f.home.name) + ' – ' + bd(x.f.away.name) + ' · ' + fmtTime(x.f.ts) + '</div></div><div class="sside"><span class="oddsTag">fivebet <bdi dir="ltr">' + x.r.odds.toFixed(2) + '</bdi></span></div></div>').join('') + '</div></details>').join(''); };
   html += '<div class="statBar"><button class="chip' + (wantDone ? '' : ' on') + '" data-tstat="live">⏳ רלוונטיים</button><button class="chip' + (wantDone ? ' on' : '') + '" data-tstat="done">✅ נגמרו</button></div>';
   if (sp === 'f') {
     const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 כל המשחקים', 'כל משחקי היום לפי ליגה ושעה, כמו באפליקציית תוצאות. לחיצה על משחק פותחת ניתוח מלא.', gamesPaneHtml(cat), state.day.fixtures.length]];
@@ -623,6 +623,24 @@ function stakesCard(f) {
   const tn = c.tension === 'high' ? 'שתי הקבוצות עם הרבה על הכף: משחק רציני משני הצדדים.' : c.tension === 'low' ? 'לשתי הקבוצות אין הרבה על הכף: סיכוי לרוטציה ולמשחק פחות לוחץ.' : '';
   return '<div class="card"><h4>🎯 מה על הכף ואיך הן מגיעות</h4><ul class="notes">' + rows.join('') + '</ul>' + (tn ? '<p class="muted" style="margin:6px 0 0">' + tn + '</p>' : '') + '</div>';
 }
+// בדיקת הימור מול התוצאה בפועל (כדורגל): win / lose / push, או null אם אין עדיין נתונים
+function gradeRec(key, f) {
+  const R = f && f.result; if (!R) return null;
+  const [stat, group, side, ln] = String(key).split('|'), line = ln === '' || ln == null ? null : Number(ln);
+  const v = stat === 'g' ? R.g : R.stats && R.stats[stat]; if (!v || v[0] == null || v[1] == null) return null;
+  const h = v[0], a = v[1], cmp = (x, over) => x === line ? 'push' : ((over ? x > line : x < line) ? 'win' : 'lose'), tf = b => b ? 'win' : 'lose';
+  if (group === 'total') return cmp(h + a, side === 'over');
+  if (group === 'home') return cmp(h, side === 'over');
+  if (group === 'away') return cmp(a, side === 'over');
+  if (group === 'ah') { const d = (side === 'home' ? h - a : a - h) + line; return d === 0 ? 'push' : tf(d > 0); }
+  if (group === 'dc') return tf(side === '1x' ? h >= a : side === 'x2' ? h <= a : h !== a);
+  if (group === '1x2') { if (h === a) return side === 'draw' ? 'win' : (stat === 'g' ? 'lose' : 'push'); return tf((h > a) === (side === 'home')); }
+  if (group === 'btts') return tf((h > 0 && a > 0) === (side === 'yes'));
+  if (group === 'combo') { const [rs, ou] = side.split('_'), d = h - a, t = h + a, ok = rs === '1x' ? d >= 0 : rs === 'x2' ? d <= 0 : rs === '12' ? d !== 0 : rs === 'home' ? d > 0 : rs === 'away' ? d < 0 : d === 0; return tf(ok && (ou === 'over' ? t > line : t < line)); }
+  return null;
+}
+const RIC = { win: '✅', lose: '❌', push: '↩' };
+const recRes = (r, f) => { const m = (f.markets || []).find(x => [x.stat, x.group, x.side, x.line].join('|') === r.key); if (m && m.res) return m.res.includes('win') ? 'win' : m.res.includes('lose') ? 'lose' : 'push'; return gradeRec(r.key, f); };
 const cleanTxt = t => String(t || '').replace(/[^.]*יחס משוער[^.]*\.\s*/g, '').trim();
 const LG_ORDER = [2, 3, 848, 39, 140, 135, 78, 61, 88, 94, 40, 79, 45, 48, 137, 143, 81, 384, 5];
 function gamesPaneHtml(cat) {
@@ -639,7 +657,7 @@ function gamesPaneHtml(cat) {
       L.map(f => { const st = statusOfFx(f), R = rOf(f).slice(0, 2);
         const mid = f.result ? '<b class="gmScore">' + f.result.g[0] + ' : ' + f.result.g[1] + '</b><small>נגמר</small>' : st === 'live' ? '<b class="gmLive">⏳</b><small>בתהליך</small>' : '<span class="gmDash">–</span>';
         return '<div class="gm" onclick="openMatch(' + idxOf(f.id) + ')"><span class="gmT">' + fmtTime(f.ts) + '</span><div class="gmTeams"><div>' + logo(f.home, 'h') + ' ' + bd(f.home.name) + '</div><div>' + logo(f.away, 'a') + ' ' + bd(f.away.name) + '</div></div><div class="gmMid">' + mid + '</div>' +
-          '<div class="gmPicks">' + (R.length ? R.map(r => '<span class="gmPick' + (r.sc >= 7 ? ' hi' : '') + '">' + esc(r.label) + ' <bdi dir="ltr">' + r.odds.toFixed(2) + '</bdi></span>').join('') : '<span class="muted gmNone">אין המלצה חזקה</span>') + '</div><span class="gmGo">›</span></div>'; }).join('') + '</div></details>';
+          '<div class="gmPicks">' + (R.length ? R.map(r => { const rr = recRes(r, f); return '<span class="gmPick' + (r.sc >= 7 ? ' hi' : '') + (rr ? ' fin-' + rr : '') + '">' + (rr ? RIC[rr] + ' ' : '') + esc(r.label) + ' <bdi dir="ltr">' + r.odds.toFixed(2) + '</bdi></span>'; }).join('') : '<span class="muted gmNone">אין המלצה חזקה</span>') + '</div><span class="gmGo">›</span></div>'; }).join('') + '</div></details>';
   }
   return out || '<div class="empty">אין משחקים להצגה.</div>';
 }
@@ -647,8 +665,8 @@ function ourBetsCard(f) {
   const R = (state.recs || []).filter(r => String(r.id) === String(f.id) && r.odds >= 1.4).sort((a, b) => b.p - a.p);
   if (!R.length) return '';
   const mk = r => (f.markets || []).find(m => [m.stat, m.group, m.side, m.line].join('|') === r.key), cl = x => String(x || '').replace(/[⁦-⁩]/g, '');
-  return '<div class="card ourBets"><h4>🎯 ההימורים שלנו במשחק</h4>' + R.map(r => { const m = mk(r), rs = m && m.res ? RES[m.res] : null;
-    return '<div class="ob' + (rs ? ' fin-' + rs[1] : '') + '"><div class="obTop"><span class="score ' + scoreCls(r.sc) + '">' + r.sc + '</span><b class="obLbl">' + (rs ? rs[0].split(' ')[1] + ' ' : '') + esc(r.label) + '</b><span class="oddsTag">fivebet <bdi dir="ltr">' + r.odds.toFixed(2) + '</bdi></span></div>' + (r.why ? '<p class="obWhy">' + esc(cl(r.why)) + '</p>' : '') + '</div>'; }).join('') + '</div>';
+  return '<div class="card ourBets"><h4>🎯 ההימורים שלנו במשחק</h4>' + R.map(r => { const rr = recRes(r, f);
+    return '<div class="ob' + (rr ? ' fin-' + rr : '') + '"><div class="obTop"><span class="score ' + scoreCls(r.sc) + '">' + r.sc + '</span><b class="obLbl">' + (rr ? RIC[rr] + ' ' : '') + esc(r.label) + '</b><span class="oddsTag">fivebet <bdi dir="ltr">' + r.odds.toFixed(2) + '</bdi></span></div>' + (r.why ? '<p class="obWhy">' + esc(cl(r.why)) + '</p>' : '') + '</div>'; }).join('') + '</div>';
 }
 function renderMatch(i) {
   const f = state.day.fixtures[i], lg = leagueOf(f.lg), ch = f.character || {};
