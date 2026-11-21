@@ -107,12 +107,15 @@ function pickBB(T, exclGames) {
   }
   return opts.sort((x, y) => y.sc - x.sc);
 }
+// יחס כולל לפחות 3.5 (יעד 4-5): מוסיפים משחקים חזקים נוספים עד שמגיעים, ואם עדיין לא מגיעים לא מציגים טופס
+const prodO = os => os.reduce((p, o) => p * o.legs.reduce((q, c) => q * c.odds, 1), 1);
+function bandBB(opts, min = 3) { const A = opts.slice(0, min); let i = min; while (prodO(A) < 3.5 && i < opts.length && A.length < 5) A.push(opts[i++]); return prodO(A) >= 3.5 ? A : []; }
 for (const sp of ['n', 'e']) {
   const T = pool.filter(c => bySport(c) === sp);
-  const A = pickBB(T, new Set()).slice(0, 3);
-  if (A.length === 3 || (sp === 'e' && A.length >= 1)) {
+  const A = bandBB(pickBB(T, new Set()), sp === 'e' ? 1 : 3);
+  if (A.length >= 1) {
     spec.strong[sp] = A.flatMap(o => o.legs).map(c => leg(c, sp));
-    if (sp !== 'e') { const used = new Set(A.map(o => o.id)), B = pickBB(T, used).slice(0, 3); if (B.length === 3) spec.second[sp] = B.flatMap(o => o.legs).map(c => leg(c, sp)); }
+    if (sp !== 'e') { const used = new Set(A.map(o => o.id)), B = bandBB(pickBB(T, used)); if (B.length >= 3) spec.second[sp] = B.flatMap(o => o.legs).map(c => leg(c, sp)); }
   }
 }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `bb-spec-${date}.json`), JSON.stringify(spec, null, 1));
