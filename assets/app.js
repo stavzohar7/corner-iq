@@ -214,7 +214,7 @@ function dayChips() {
   return '<div class="dayStrip"><div class="chips">' + days.map(d => {
     const st = slipDayStat(d.date), future = d.date > t;
     const sub = st ? (st.w + st.l ? st.w + ' מתוך ' + (st.w + st.l) + ' טפסים נתפסו' : st.n + ' טפסים · ' + (future ? 'ממתינים' : 'ממתינים לתוצאה')) : (d.picks ? d.picks + ' המלצות' : '');
-    return '<button class="chip dchip' + (d.date === state.day.date ? ' on' : '') + '" data-day="' + d.date + '"><b>' + dayName(d.date) + '</b><small>' + fmtShort(d.date) + (sub ? '<br>' + sub : '') + '</small></button>';
+    return '<button class="chip dchip' + (d.date === state.day.date ? ' on' : '') + '" data-day="' + d.date + '"><b>' + dayName(d.date) + '</b><small>' + fmtShort(d.date) + '</small>' + (sub ? '<em class="dsub">' + sub + '</em>' : '') + '</button>';
   }).join('') + '</div><span class="muted dayHint">ימים ישנים יותר: בתפריט שבראש העמוד</span></div>';
 }
 // סיכום של היום שנבחר, על אותו יום בלבד: טפסים והמלצות בודדות
@@ -457,7 +457,7 @@ async function fillToday(date) {
       [...by.entries()].sort((a, b) => Math.min(...a[1].map(x => x.f.ts)) - Math.min(...b[1].map(x => x.f.ts))).map(([lg, L], k) => '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(lg) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="srows">' + L.sort((a, b) => b.r.p - a.r.p).map(x => (() => { x.rr = recRes(x.r, x.f); return ''; })() + '<div class="srow' + (x.rr ? ' fin-' + (x.rr === 'win' ? 'win' : x.rr === 'lose' ? 'lose' : 'push') : '') + '" onclick="openMatch(' + idxOf(x.f.id) + ')"><span class="score ' + scoreCls(x.r.sc) + '">' + x.r.sc + '</span><div class="smain"><div class="plabel">' + (x.rr ? RIC[x.rr] + ' ' : '') + (cat ? '' : ((BET_CATS.find(c => c[0] === catOfKey(x.r.key)) || [])[1] || '') + ' ') + esc(x.r.label) + '</div><div class="pmeta">' + bd(x.f.home.name) + ' – ' + bd(x.f.away.name) + ' · ' + fmtTime(x.f.ts) + '</div></div><div class="sside"><span class="oddsTag">fivebet <bdi dir="ltr">' + x.r.odds.toFixed(2) + '</bdi></span></div></div>').join('') + '</div></details>').join(''); };
   if (sp !== 'f') html += '<div class="toolbar"><div class="stSeg"><button class="' + (wantDone ? '' : 'on') + '" data-tstat="live">⏳ רלוונטיים</button><button class="' + (wantDone ? 'on' : '') + '" data-tstat="done">✅ נגמרו</button></div></div>';
   if (sp === 'f') {
-    const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 כל המשחקים', 'כל משחקי היום לפי ליגה ושעה, כמו באפליקציית תוצאות. לחיצה על משחק פותחת ניתוח מלא.', gamesPaneHtml(cat), state.day.fixtures.length]];
+    const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 משחקים', 'כל משחקי היום לפי ליגה ושעה, כמו באפליקציית תוצאות. לחיצה על משחק פותחת ניתוח מלא.', gamesPaneHtml(cat), state.day.fixtures.length]];
     html += slipsHtml(s, sp, cat, wantDone, extras) || '<div class="empty">אין כאן עדיין כלום.</div>';
   } else html += state.tmode === 'slips' ? pSlips : pSing;
   box.innerHTML = html; saveUi();
