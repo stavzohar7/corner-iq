@@ -199,7 +199,7 @@ function bandPick(pool, avoidGames = new Set(), maxGames = 4) {
     const G = gameOptions(pool, min); if (G.length < 2) continue;
     let best = null;
     const rec = (i, pick, tot, n) => {
-      if (i === G.length) { if (n >= 2 && tot >= BAND_MIN) { const sc = pick.reduce((s, o) => s + o.sc, 0) / n - 0.04 * Math.abs(Math.log(tot / BAND_MID)) * 4 - (tot > BAND_MAX ? 0.5 : 0) - (n > 3 ? 0.01 * (n - 3) : 0) - (n < 3 ? 0.1 : 0); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
+      if (i === G.length) { if (n >= 2 && tot >= BAND_MIN) { const sc = pick.reduce((s, o) => s + o.sc, 0) / n - 0.02 * Math.abs(Math.log(tot / BAND_MID)) - (n > 3 ? 0.01 * (n - 3) : 0) - (n < 3 ? 0.1 : 0); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
       rec(i + 1, pick, tot, n);
       if (n < maxGames) for (const o of G[i].ch) { pick.push(o); rec(i + 1, pick, tot * o.o, n + 1); pick.pop(); }
     };
