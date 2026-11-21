@@ -394,7 +394,8 @@ async function fillToday(date) {
   const d = state.day;
   const fP = (d.dayPicks || []).map(p => { const f = findFx(p.fid); return f && f.markets[p.mi] ? { f, m: f.markets[p.mi], i: idxOf(p.fid) } : null; }).filter(Boolean);
   const bP = bday ? (bday.dayPicks || []).map(p => { const g = bday.fixtures.find(x => x.id === p.fid); return g && g.markets[p.mi] ? { g, m: g.markets[p.mi] } : null; }).filter(Boolean) : [];
-  const singles = { f: fP, n: bP.filter(x => x.g.comp === 103), e: bP.filter(x => x.g.comp !== 103) };
+  const ge = x => !x.m || !(x.m.odds > 0) || x.m.odds >= 1.4;
+  const singles = { f: fP.filter(ge), n: bP.filter(x => x.g.comp === 103), e: bP.filter(x => x.g.comp !== 103) };
   const hasSlip = sp => !!(s && s.k) && (SLIP_LV.some(([lv]) => slipAt(s, lv, sp).legs.length) || (sp === 'f' && ((s.k.win || []).some(w => w.legs.length) || (s.k.lg || []).some(w => w.legs.length))));
   const sports = SLIP_SP.filter(([sp]) => hasSlip(sp) || singles[sp].length);
   if (!sports.length) { box.innerHTML = '<div class="empty">אין עדיין טפסים או המלצות ליום הזה. הם נבנים בבוקר, ברגע שהיחסים מתפרסמים.</div>'; return; }
@@ -409,6 +410,7 @@ async function fillToday(date) {
     const MP = (d.matchPicks || []).map(p => { const f = findFx(p.fid); return f && f.markets[p.mi] ? { f, m: f.markets[p.mi], i: idxOf(p.fid) } : null; }).filter(Boolean).sort((a, b) => a.f.ts - b.f.ts);
     const lgIds = [...new Set(d.fixtures.map(f => f.lg))], glg = lgIds.includes(Number(state.glg)) ? Number(state.glg) : 'all';
     const lgBar = lgIds.length > 1 ? '<div class="chips lgBar"><button class="chip' + (glg === 'all' ? ' on' : '') + '" data-glg="all">כל הליגות</button>' + lgIds.map(id => '<button class="chip' + (glg === id ? ' on' : '') + '" data-glg="' + id + '">' + lgTag(id) + '</button>').join('') + '</div>' : '';
+    for (let k = MP.length - 1; k >= 0; k--) if (!ge(MP[k])) MP.splice(k, 1);
     if (cat) { for (let k = MP.length - 1; k >= 0; k--) if (catOf(MP[k].m.stat, MP[k].m.group) !== cat) MP.splice(k, 1); }
     if (glg !== 'all') { for (let k = MP.length - 1; k >= 0; k--) if (MP[k].f.lg !== glg) MP.splice(k, 1); }
     const noMk = cat ? [] : d.fixtures.filter(f => !MP.some(x => x.f === f) && (glg === 'all' || f.lg === glg)).sort((a, b) => a.ts - b.ts);
@@ -417,7 +419,7 @@ async function fillToday(date) {
       pGames += '<h3 class="secTitle">🗂 כל משחקי היום: ההמלצה הטובה ביותר לכל משחק' + (gw + gl ? ' <span class="muted">· נתפסו ' + gw + ' · נפלו ' + gl + '</span>' : '') + '</h3><p class="srcNote">לכל משחק בליגות שלנו יש כאן המלצה אחת, גם אם היא לא נכנסה לטפסים. ציון 6 ומעלה = המלצה טובה, מתחת ל-6 = חלשה, לעיון בלבד. לחיצה פותחת את המשחק.</p>' + lgBar + groupByLg(MP, glg !== 'all') + '<div class="srows">' + noMk.map(f => '<div class="srow" onclick="openMatch(' + idxOf(f.id) + ')"><span class="score s-lo">–</span><div class="smain"><div class="plabel">אין עדיין המלצה</div><div class="pmeta">' + bd(f.home.name) + ' – ' + bd(f.away.name) + ' · ' + esc(leagueOf(f.lg).he) + ' · ' + fmtTime(f.ts) + '</div><div class="muted">חסרים נתונים או יחסים. מתעדכן אוטומטית כל שעה.</div></div></div>').join('') + '</div>';
     }
   }
-  if (sp === 'f') (state.recs || []).forEach(r => { const p = r.key.split('|'); cnt(p[0], p[1], r.id, r.label); });
+  if (sp === 'f') (state.recs || []).forEach(r => { const p = r.key.split('|'); if (r.odds >= 1.4) cnt(p[0], p[1], r.id, r.label); });
   const L = (sp === 'f' && cat) ? singles[sp].filter(x => catOf(x.m.stat, x.m.group) === cat) : singles[sp], LIM = state.allPicks === sp ? 999 : 8, isW = r => r && r.includes('win'), isL = r => r && r.includes('lose');
   const w = L.filter(x => isW(x.m.res)).length, l = L.filter(x => isL(x.m.res)).length;
   pSing += '<h3 class="secTitle">🎯 המלצות בודדות · ' + spName + (w + l ? ' <span class="muted">· נתפסו ' + w + ' · נפלו ' + l + '</span>' : '') + '</h3><p class="srcNote">כל המלצה כאן עומדת לבד ואינה חלק מטופס. היחסים כאן של Bet365, לעיון.</p>';
@@ -426,11 +428,11 @@ async function fillToday(date) {
   if (!modes.some(m => m[0] === state.tmode)) state.tmode = 'slips';
   html += '<div class="modeBar">' + modes.map(m => '<button class="modeBtn' + (m[0] === state.tmode ? ' on' : '') + '" data-tmode="' + m[0] + '"><span>' + m[1] + '</span>' + m[2] + '</button>').join('') + '</div>';
   if (sp === 'f') html += '<div class="betBar"><span class="betLbl">סנן לפי סוג הימור</span><div class="chips"><button class="chip' + (cat ? '' : ' on') + '" data-betf="all">הכל</button>' + BET_CATS.filter(c => catCnt[c[0]] || c[0] === cat).map(c => '<button class="chip' + (cat === c[0] ? ' on' : '') + '" data-betf="' + c[0] + '">' + c[1] + ' ' + c[2] + ' <small>' + (catCnt[c[0]] || 0) + '</small></button>').join('') + '</div></div>';
-  const recRows = () => { const R = (state.recs || []).filter(r => catOfKey(r.key) === cat).map(r => ({ r, f: findFx(r.id) })).filter(x => x.f); if (!R.length) return '<div class="empty">אין היום המלצות מהסוג הזה.</div>';
+  const recRows = () => { const R = (state.recs || []).filter(r => r.odds >= 1.4 && catOfKey(r.key) === cat).map(r => ({ r, f: findFx(r.id) })).filter(x => x.f); if (!R.length) return '<div class="empty">אין היום המלצות מהסוג הזה.</div>';
     const by = new Map(); for (const x of R) (by.get(x.f.lg) || by.set(x.f.lg, []).get(x.f.lg)).push(x);
     const cn = (BET_CATS.find(c => c[0] === cat) || [])[2] || '';
     return '<h3 class="secTitle">' + (BET_CATS.find(c => c[0] === cat) || [])[1] + ' כל ההמלצות · ' + cn + ' <span class="muted">· ' + R.length + ' הימורים</span></h3><p class="srcNote">כל ההימורים מהסוג הזה שהמערכת ממליצה עליהם היום, עם יחס fivebet אמיתי. מהחזק לחלש בכל ליגה. לחיצה פותחת את המשחק.</p>' +
-      [...by.entries()].sort((a, b) => Math.min(...a[1].map(x => x.f.ts)) - Math.min(...b[1].map(x => x.f.ts))).map(([lg, L], k) => '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(lg) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="srows">' + L.sort((a, b) => b.r.p - a.r.p).map(x => '<div class="srow" onclick="openMatch(' + idxOf(x.f.id) + ')"><span class="score ' + scoreCls(x.r.sc) + '">' + x.r.sc + '</span><div class="smain"><div class="plabel">' + esc(x.r.label) + '</div><div class="pmeta">' + bd(x.f.home.name) + ' – ' + bd(x.f.away.name) + ' · ' + fmtTime(x.f.ts) + '</div></div><div class="sside"><span class="oddsTag">fivebet <bdi dir="ltr">' + x.r.odds.toFixed(2) + '</bdi></span></div></div>').join('') + '</div></details>').join(''); };
+      [...by.entries()].sort((a, b) => Math.min(...a[1].map(x => x.f.ts)) - Math.min(...b[1].map(x => x.f.ts))).map(([lg, L], k) => '<details class="lgGroup" open><summary><span class="lgName">' + lgTag(lg) + '</span><span class="lgCount">' + L.length + '</span></summary><div class="srows">' + L.sort((a, b) => b.r.p - a.r.p).map(x => (() => { const mk = (x.f.markets || []).find(m => [m.stat, m.group, m.side, m.line].join('|') === x.r.key), rs = mk && mk.res ? RES[mk.res] : null; x.rs = rs; return ''; })() + '<div class="srow' + (x.rs ? ' fin-' + x.rs[1] : '') + '" onclick="openMatch(' + idxOf(x.f.id) + ')"><span class="score ' + scoreCls(x.r.sc) + '">' + x.r.sc + '</span><div class="smain"><div class="plabel">' + (x.rs ? x.rs[0].split(' ')[1] + ' ' : '') + esc(x.r.label) + '</div><div class="pmeta">' + bd(x.f.home.name) + ' – ' + bd(x.f.away.name) + ' · ' + fmtTime(x.f.ts) + '</div></div><div class="sside"><span class="oddsTag">fivebet <bdi dir="ltr">' + x.r.odds.toFixed(2) + '</bdi></span></div></div>').join('') + '</div></details>').join(''); };
   html += state.tmode === 'slips' ? pSlips : cat ? recRows() : state.tmode === 'singles' ? pSing : pGames;
   box.innerHTML = html;
   box.querySelectorAll('[data-tmode]').forEach(b => b.onclick = () => { state.tmode = b.dataset.tmode; fillToday(date); });
