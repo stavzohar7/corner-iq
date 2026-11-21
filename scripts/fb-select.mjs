@@ -236,7 +236,8 @@ fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.
 { const dir = path.join(ROOT, 'data', 'fbodds'), file = path.join(dir, date + '.json'); fs.mkdirSync(dir, { recursive: true });
   let old = {}; try { old = readJson(file).odds || {}; } catch (e) {}
   for (const [id, O] of Object.entries(fbAll)) old[id] = { ...(old[id] || {}), ...O };
-  fs.writeFileSync(file, JSON.stringify({ updated: new Date().toISOString(), odds: old })); }
+  const seenR = new Set(), recs = cands.filter(c => c.pb >= 0.6 && c.pb * c.odds - 1 >= EV_MIN).sort((x, y) => y.pb - x.pb).filter(c => { const k = gid(c) + '|' + c.key; if (seenR.has(k)) return false; seenR.add(k); return true; }).map(c => ({ id: c.f.id, key: c.key, label: c.label, odds: c.odds, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), sc: c.pb >= 0.64 ? 7 : 6 }));
+  fs.writeFileSync(file, JSON.stringify({ updated: new Date().toISOString(), odds: old, recs })); }
 
 console.log(`משחקים מ-fivebet: ${games.length}, הותאמו: ${matched.length}${unmatched.length ? ', לא הותאמו: ' + unmatched.join('; ') : ''}`);
 console.log(`הימורים אפשריים: ${cands.length}`);
