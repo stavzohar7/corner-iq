@@ -94,3 +94,14 @@ h3.secTitle { font-size: 17px; margin: 18px 2px 8px; }
 .sumW b { color: var(--good); } .sumL b { color: var(--bad); } .sumP b { color: var(--text); }
 .sumBar { height: 8px; border-radius: 99px; background: rgba(255,111,111,.35); margin: 10px 0 6px; overflow: hidden; } .sumBar i { display: block; height: 100%; background: var(--good); border-radius: 99px; }
 .sumNote { font-size: 12.5px; color: var(--text-2); }
+
+/* לייב */
+.stSeg button b { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: #ff4d4d; color: #fff; font-size: 11px; margin-inline-start: 3px; }
+.ldot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; margin-inline-end: 6px; animation: lp 1.2s infinite; vertical-align: 1px; }
+@keyframes lp { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+.liveChip { margin-top: 6px; display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700; background: rgba(255,77,77,.1); border: 1px solid rgba(255,77,77,.35); }
+.liveChip.ok, .liveChip.ok2 { background: rgba(47,227,155,.12); border-color: rgba(47,227,155,.5); }
+.liveChip.bad, .liveChip.bad2 { background: rgba(255,111,111,.14); border-color: rgba(255,111,111,.55); }
+.liveChip.na { opacity: .7; }
+.liveMin { color: #ff6b6b; font-weight: 800; }
+.slipLeg .liveChip { margin-top: 6px; }
