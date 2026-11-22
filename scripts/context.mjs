@@ -11,7 +11,7 @@ export function norm(s) {
 // שמות שהשוואה אוטומטית לא תתפוס (API-Football → football-data)
 const ALIAS = {
   'inter milan': 'inter', 'olympique de marseille': 'marseille', 'karlsruher': 'karlsruhe',
-  'kasimpasa': 'kasimpasa', 'hamburger sv': 'hamburg', 'bayern munchen': 'bayern munich', 'sheffield utd': 'sheffield united', 'fortuna sittard': 'for sittard',
+  'kasimpasa': 'kasimpasa', 'hamburger sv': 'hamburg', 'bayern munchen': 'bayern munich', 'sheffield utd': 'sheffield united', 'fortuna sittard': 'for sittard', 'fortuna s': 'for sittard', 'manchester utd': 'man united', 'sparta r': 'sparta rotterdam',
   'amed': 'amedspor', 'goztepe': 'goztep', 'basaksehir': 'buyuksehyr', 'istanbul basaksehir': 'buyuksehyr', 'oh leuven': 'oud heverlee leuven', 'athletic club': 'ath bilbao',
   'paris saint germain': 'paris sg', 'paris saint germain fc': 'paris sg',
   'manchester city': 'man city', 'manchester united': 'man united', 'nottingham forest': 'nott m forest', 'wolverhampton wanderers': 'wolves',
