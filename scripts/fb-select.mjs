@@ -55,7 +55,9 @@ const STAT_HE = { g: 'שערים', c: 'קרנות', c1: 'קרנות במחצית
 const fbAll = {};   // כל יחסי fivebet שנקראו (כל השוקים, בלי סינון), לתצוגה באתר
 for (const { G, f } of matched) {
   if ((!process.env.RECS_ALL && f.ts * 1000 < Date.now() + 10 * 60e3) || !f.exp) continue;
-  const E = f.exp, dist = {}; for (const st of ['g', 'c', 'c1', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
+  const E = { ...f.exp }, dist = {};
+  { const mw = f.character && f.character.mw, fp = mw ? Math.max(mw.h, mw.a) : 0;
+    if (fp >= 0.75 && E.c && E.c.h != null) { const homeFav = mw.h >= mw.a, up = 1.5, dn = 1.1; E.c = { ...E.c, h: Math.max(0.5, E.c.h + (homeFav ? up : -dn)), a: Math.max(0.5, E.c.a + (homeFav ? -dn : up)) }; E.c.total = E.c.h + E.c.a; f.__dom = homeFav ? 'h' : 'a'; } } for (const st of ['g', 'c', 'c1', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
   const LGA = Object.fromEntries(["g", "c", "c1", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
   const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); 
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
@@ -193,6 +195,7 @@ function gameOptions(pool, min) {
   }
   return res.sort((a, b) => b.best - a.best).slice(0, 8);
 }
+const riskFam = c => { const p = c.key.split('|'); if (p[2] === 'over' || (p[0] === 'sh' || p[0] === 'sot') && p[2] === 'over') return p[0] + '-over'; if (p[2] === 'under') return p[0] + '-under'; return null; };
 function bandPick(pool, avoidGames = new Set(), maxGames = 4) {
   pool = pool.filter(c => !avoidGames.has(gid(c)));
   for (const min of [0.6, 0.57, 0.54, 0.5]) {
@@ -201,7 +204,9 @@ function bandPick(pool, avoidGames = new Set(), maxGames = 4) {
     const rec = (i, pick, tot, n) => {
       if (i === G.length) { if (n >= 2 && tot >= BAND_MIN) { const sc = pick.reduce((s, o) => s + Math.log(o.pj), 0) - 0.01 * Math.max(0, n - 4); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
       rec(i + 1, pick, tot, n);
-      if (n < maxGames) for (const o of G[i].ch) { pick.push(o); rec(i + 1, pick, tot * o.o, n + 1); pick.pop(); }
+      if (n < maxGames) for (const o of G[i].ch) { const fam = o.legs.map(riskFam).filter(Boolean), cnt = {}; for (const q of pick) for (const l of q.legs) { const r = riskFam(l); if (r) cnt[r] = (cnt[r] || 0) + 1; }
+        if (fam.some(x => (cnt[x] || 0) + fam.filter(y => y === x).length > 1)) continue;   // לא יותר מהימור אחד מאותה משפחה מתואמת בטופס (למשל מעל קרנות)
+        pick.push(o); rec(i + 1, pick, tot * o.o, n + 1); pick.pop(); }
     };
     rec(0, [], 1, 0);
     if (best) return best.pick.flatMap(o => o.legs);
