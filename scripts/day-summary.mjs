@@ -35,7 +35,7 @@ for (const date of dates) {
   const fb = rj('data/fbodds/' + date + '.json'), day = rj('data/days/' + date + '.json');
   if (fb && fb.recs && fb.recs.length && day) {
     sg.src = 'recs';
-    for (const r of fb.recs) { if (r.odds < 1.4 || (r.sc || 6) < 6 || inSlip.has(String(r.id) + '|' + r.key)) continue; const f = (day.fixtures || []).find(x => String(x.id) === String(r.id)); if (!f) continue; sg.n++;
+    for (const r of fb.recs) { if (r.odds < 1.4 || (r.sc || 6) < 7 || inSlip.has(String(r.id) + '|' + r.key)) continue; const f = (day.fixtures || []).find(x => String(x.id) === String(r.id)); if (!f) continue; sg.n++;
       const g = f.result ? gradeRec(r.key, f.result) : null; if (g === 'win') sg.w++; else if (g === 'lose') sg.l++; else if (g === 'push') sg.p++; else sg.pend++; }
   } else {
     const L = (I.picksLog || []).filter(e => e.d === date); if (L.length) sg.src = 'old';
@@ -44,7 +44,7 @@ for (const date of dates) {
   // יומן הימורים מלא: כל רגל בטפסים (פעם אחת לכל משחק+הימור) וגם הימורים בודדים (ציון 7 ומעלה) שלא בטפסים
   { const seen = new Set(), lgOf = id => { const f = day && (day.fixtures || []).find(x => String(x.id) === String(id)); return f ? f.lg : null; };
     for (const S of fS) for (const l of S.legs) { const k = l.id + '|' + l.key; if (seen.has(k)) continue; seen.add(k); betlog.push({ d: date, sp: 'f', lg: l.lg || lgOf(l.id), k: l.key, o: l.odds, r: resOf(l.res), s: 1, g: clean(l.game) }); }
-    if (fb && fb.recs && day) for (const r of fb.recs) { if (r.odds < 1.4 || (r.sc || 6) < 6) continue; const k = r.id + '|' + r.key; if (seen.has(k)) continue; const f = (day.fixtures || []).find(x => String(x.id) === String(r.id)); if (!f) continue; seen.add(k); betlog.push({ d: date, sp: 'f', lg: f.lg, k: r.key, o: r.odds, r: f.result ? resOf(gradeRec(r.key, f.result)) : null, s: 0, g: clean(f.home.name) + ' – ' + clean(f.away.name) }); }
+    if (fb && fb.recs && day) for (const r of fb.recs) { if (r.odds < 1.4 || (r.sc || 6) < 7) continue; const k = r.id + '|' + r.key; if (seen.has(k)) continue; const f = (day.fixtures || []).find(x => String(x.id) === String(r.id)); if (!f) continue; seen.add(k); betlog.push({ d: date, sp: 'f', lg: f.lg, k: r.key, o: r.odds, r: f.result ? resOf(gradeRec(r.key, f.result)) : null, s: 0, g: clean(f.home.name) + ' – ' + clean(f.away.name) }); }
     const seenB = new Set(); for (const sp of ['n', 'e']) for (const S of [k.strong && k.strong[sp], k.second && k.second[sp]]) if (S && S.legs) for (const l of S.legs) { const kk = l.id + '|' + l.key; if (seenB.has(kk)) continue; seenB.add(kk); betlog.push({ d: date, sp, lg: sp === 'n' ? 103 : 569, k: l.key, o: l.odds, r: resOf(l.res), s: 1, g: clean(l.game) }); } }
   if (!fS.length && !bS.length && !sg.n) continue;
   const list = [];

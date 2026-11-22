@@ -95,7 +95,7 @@ const ok = c => c.tier === 'prop' ? (c.pb >= 0.6 && c.gap <= 0.2) : (c.pb >= 0.5
 for (const c of cands) c.rk = c.pb - (c.tier === 'prop' ? 0.04 : 0);   // שווקים חדשים שעוד לא נבדקו: מדורגים נמוך יותר, כך שהימור מאומת בשווי דומה קודם
 const pool = cands.filter(ok).sort((a, b) => b.rk - a.rk);
 if (process.env.BB_DEBUG) for (const c of cands.filter(c => c.tier === 'prop').sort((a, b) => b.pb - a.pb)) console.log((ok(c) ? 'OK ' : '-- ') + c.pb.toFixed(2) + ' @' + c.odds + ' (מודל ' + c.pm + ', אתר ' + c.ps + ') ' + c.label + ' [' + c.key + ']');
-const leg = (c, sp) => ({ sport: sp, id: c.game.id, key: c.key, label: c.label, odds: c.odds, score: c.pb >= 0.64 ? 7 : 6, p: c.pb, ev: c.ev, why: c.why });
+const leg = (c, sp) => ({ sport: sp, id: c.game.id, key: c.key, label: c.label, odds: c.odds, score: (pb => pb >= 0.84 ? 10 : pb >= 0.78 ? 9 : pb >= 0.72 ? 8 : pb >= 0.64 ? 7 : 6)(c.pb), p: c.pb, ev: c.ev, why: c.why });
 const bySport = c => c.game.comp === 103 ? 'n' : 'e';
 const spec = { date, strong: {}, second: {} };
 // טפסים חזקים: עד 3 משחקים. הימור שני באותו משחק רק אם הוא חזק (רף גבוה), מסוג שונה ולא סותר, ושני ההימורים יחד ביחס 1.8 לפחות.
