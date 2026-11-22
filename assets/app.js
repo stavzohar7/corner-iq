@@ -1084,7 +1084,7 @@ function weekHtml(ws, compact) {
   return html + '</div>';
 }
 const trTab = () => state.trSub || 'slips', hid = k => trTab() === k ? '' : ' hidden';
-const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['learn', '🧠 מה למדנו'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
+const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['learn', '🧠 מה למדנו'], ['days', '📆 לפי יום'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
 function weekPanel() {
   const wl = weekList(); if (!wl.length) return '<div class="empty">עוד אין נתונים לסיכום.</div>';
   const cur = state.wk === 'all' || (state.wk && wl.includes(state.wk)) ? state.wk : wl[0];
@@ -1134,6 +1134,20 @@ function splitPanel() {
     '<div class="card"><h4>⚽ כדורגל לפי סוג הימור</h4><div class="tblWrap"><table>' + head('סוג הימור') + '<tbody>' + tk.map(t => line(TYPE_NAME[t] || t, typeRows[t])).join('') + '</tbody></table></div></div>';
 }
 // "מה למדנו מהתוצאות": הלקחים שהמערכת מחשבת לבד מכל ההימורים שנגמרו
+// סיכום לפי יום: טפסים (תיאורטית 100 ₪ לכל טופס) והימורים בודדים שלא נכנסו לטפסים, כדורגל וכדורסל בעמודות נפרדות
+async function fillDays() {
+  const box = $('#daysBox'); if (!box) return;
+  let D; try { D = await getJson('data/daysummary.json'); } catch (e) { box.innerHTML = '<div class="empty">עוד אין סיכום ימים.</div>'; return; }
+  const days = (D.days || []).filter(d => d.date <= addDays(ilToday(), 1)), mc = v => '<b class="' + (v > 0 ? 'pos' : v < 0 ? 'neg' : '') + '">' + (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v) + ' ₪</b>';
+  const sl = s => s.n ? '<div class="dsLine">' + s.w + ' נתפסו · ' + s.l + ' נפלו' + (s.p ? ' · ' + s.p + ' ממתינים' : '') + '</div><div class="dsMoney">' + mc(s.profit) + '</div>' : '<div class="muted">אין טפסים</div>';
+  const sg = s => s && s.n ? '<div class="dsLine">' + s.w + ' נתפסו · ' + s.l + ' נפלו' + (s.pend + s.p ? ' · ' + (s.pend + s.p) + ' ממתינים' : '') + '</div>' : '<div class="muted">—</div>';
+  const tot = { f: { n: 0, w: 0, l: 0, p: 0, profit: 0 }, b: { n: 0, w: 0, l: 0, p: 0, profit: 0 }, sg: { w: 0, l: 0 } };
+  for (const d of days) { for (const k of ['f', 'b']) for (const x of ['n', 'w', 'l', 'p', 'profit']) tot[k][x] += d[k].slips[x]; if (d.f.singles) { tot.sg.w += d.f.singles.w; tot.sg.l += d.f.singles.l; } }
+  box.innerHTML = '<div class="card"><h4>📆 סיכום לפי יום</h4><p class="sub2">רווח או הפסד אם כל טופס נשלח ב-100 ₪: טופס שנתפס מזכה ביחס הכולל פחות 100, טופס שנפל מפסיד 100. "הימורים בודדים" הם רק הימורים בציון 7 ומעלה שלא היו בתוך אף טופס באותו יום.</p>' +
+    '<div class="tblWrap"><table class="dsTbl"><thead><tr><th rowspan="2">יום</th><th colspan="3" class="grpF">⚽ כדורגל</th><th colspan="2" class="grpB">🏀 כדורסל</th></tr><tr><th>טפסים</th><th class="num">רווח/הפסד</th><th>הימורים בודדים (מחוץ לטפסים)</th><th>טפסים</th><th class="num">רווח/הפסד</th></tr></thead><tbody>' +
+    days.map(d => '<tr><td><b>' + dayName(d.date) + '</b><br><span class="muted">' + fmtShort(d.date) + '</span></td><td>' + (d.f.slips.n ? '<div class="dsLine">' + d.f.slips.w + ' נתפסו · ' + d.f.slips.l + ' נפלו' + (d.f.slips.p ? ' · ' + d.f.slips.p + ' ממתינים' : '') + '</div>' : '<span class="muted">אין טפסים</span>') + '</td><td class="num">' + (d.f.slips.n ? mc(d.f.slips.profit) : '') + '</td><td>' + sg(d.f.singles) + '</td><td>' + (d.b.slips.n ? '<div class="dsLine">' + d.b.slips.w + ' נתפסו · ' + d.b.slips.l + ' נפלו' + (d.b.slips.p ? ' · ' + d.b.slips.p + ' ממתינים' : '') + '</div>' : '<span class="muted">אין טפסים</span>') + '</td><td class="num">' + (d.b.slips.n ? mc(d.b.slips.profit) : '') + '</td></tr>').join('') +
+    '</tbody><tfoot><tr><td><b>סה״כ</b></td><td><div class="dsLine">' + tot.f.w + ' נתפסו · ' + tot.f.l + ' נפלו</div></td><td class="num">' + mc(tot.f.profit) + '</td><td><div class="dsLine">' + tot.sg.w + ' נתפסו · ' + tot.sg.l + ' נפלו</div></td><td><div class="dsLine">' + tot.b.w + ' נתפסו · ' + tot.b.l + ' נפלו</div></td><td class="num">' + mc(tot.b.profit) + '</td></tr></tfoot></table></div></div>';
+}
 async function fillLearn() {
   const box = $('#learnBox'); if (!box) return;
   let L; try { L = await getJson('data/lessons.json'); } catch (e) { box.innerHTML = '<div class="empty">עדיין אין לקחים.</div>'; return; }
@@ -1160,7 +1174,7 @@ function singlesPanel() {
 function renderTrack() {
   const el = $('#view-track'), log = (state.index.picksLog || []).slice().sort((a, b) => b.ts - a.ts);
   if (state.tlg && state.tlg !== 'all') { renderLeagueView(el); return; }
-  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="learn"' + hid('learn') + '><div id="learnBox"><div class="empty">טוען...</div></div></section><section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '>' + splitPanel() + '<p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
+  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="learn"' + hid('learn') + '><div id="learnBox"><div class="empty">טוען...</div></div></section><section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="days"' + hid('days') + '><div id="daysBox"><div class="empty">טוען...</div></div></section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '>' + splitPanel() + '<p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
   { // ⚽ כדורגל לפי ליגה: איפה ההמלצות עובדות יותר ואיפה פחות (כל ההמלצות על משחקים, לא רק הנבחרות של היום)
     const D = state.index.detail || {}, byLg = D.byLeague || {}, byLT = D.byLeagueType || {};
     const dn = x => x.win + x.lose, keys = Object.keys(byLg).filter(k => dn(byLg[k]) > 0).sort((x, y) => (byLg[y].win / dn(byLg[y])) - (byLg[x].win / dn(byLg[x])) || dn(byLg[y]) - dn(byLg[x]));
@@ -1198,7 +1212,7 @@ function renderTrack() {
     list.map(e => { const r = e.res ? RES[e.res] : null, st = statusOfLog(e); return '<tr class="clk" onclick="openMatchOf(\'' + e.d + '\',\'' + String(e.id).replace(/'/g, '') + '\')"><td>' + fmtShort(e.d) + '</td><td>' + bd(e.h) + ' – ' + bd(e.a) + '</td><td>' + (TYPE_NAME[e.t] || '').split(' ')[0] + ' ' + esc(e.label) + '</td><td class="num"><span class="score ' + scoreCls(e.score) + '">' + e.score + '</span></td><td class="num">' + (e.price ? e.price.toFixed(2) : '—') + '</td><td class="num">' + (r ? '<span class="res ' + r[1] + '">' + r[0] + '</span>' : st === 'upcoming' ? '🕒 ' + fmtTime(e.ts) : '⏳') + '</td><td>' + esc(e.act || '') + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted" style="margin-top:10px">אין המלצות במצב הזה.</p>') + '</div>';
   html += '</section>';
   el.innerHTML = html;
-  fillSlipHist(); fillLearn();
+  fillSlipHist(); fillLearn(); fillDays();
   bindSf(renderTrack);
   el.querySelectorAll('[data-trsub]').forEach(b => b.onclick = () => { state.trSub = b.dataset.trsub; renderTrack(); });
   el.querySelectorAll('[data-wk]').forEach(b => b.onclick = () => { state.wk = b.dataset.wk; renderTrack(); });

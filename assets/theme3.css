@@ -111,3 +111,6 @@ h3.secTitle { font-size: 17px; margin: 18px 2px 8px; }
 .liveSum .lsT { font-weight: 800; margin-bottom: 8px; }
 .liveSum .lsRow { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 13.5px; color: var(--text-2); } .liveSum .lsRow b { color: var(--text); font-size: 17px; margin-inline-start: 3px; }
 .liveSlip { margin: 0 0 8px; padding: 6px 10px; border-radius: 10px; font-size: 13px; font-weight: 700; background: rgba(47,227,155,.1); border: 1px solid rgba(47,227,155,.4); } .liveSlip.bad { background: rgba(255,111,111,.12); border-color: rgba(255,111,111,.5); }
+
+.dsTbl th, .dsTbl td { vertical-align: middle; } .dsTbl .grpF { background: rgba(54,163,255,.12); } .dsTbl .grpB { background: rgba(255,159,64,.12); }
+.dsTbl .dsLine { white-space: nowrap; } .dsTbl tfoot td { border-top: 2px solid var(--line); font-weight: 700; }
