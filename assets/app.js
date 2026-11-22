@@ -4,8 +4,8 @@ const $ = s => document.querySelector(s);
 const POLISH = [
   [/לפי הניתוח היחס גבוה ממה שההימור שווה/g, 'היחס משתלם: לפי החישוב שלנו הסיכוי טוב יותר ממה שהיחס מרמז'],
   [/מעט משחקים בהיסטוריה/g, 'יש מעט משחקים קודמים להסתמך עליהם'],
-  [/ההרכבים עדיין לא סופיים/g, 'ההרכבים עוד לא רשמיים'],
-  [/ההרכבים לא סופיים\. כדאי לבדוק לפני הימור\./g, 'ההרכבים עוד לא רשמיים. כדאי לבדוק אותם לפני שמהמרים.'],
+  [/\s*ההרכבים עדיין לא סופיים\.?/g, ''],
+  [/\s*ההרכבים לא סופיים\. כדאי לבדוק לפני הימור\./g, ''],
   [/היחס משוער/g, 'היחס הוא הערכה שלנו (אין יחס אמיתי)'],
   [/הערכת המנתח: /g, 'לפי הבדיקה שלנו: '],
   [/ \(3 אפשרויות\)/g, ' (שוק 3 תוצאות: "בדיוק" מפסיד)'],
@@ -308,14 +308,14 @@ window.openBB = openBB;
 function lineupInfo(d, l) {
   if (l.sport !== 'f' || !state.day || state.day.date !== d.date || l.res) return null;
   const f = findFx(l.id); if (!f || f.result || f.ts < nowS() - 300) return null;
-  const n = f.news; if (!n) return { ok: false, txt: '👥 עוד אין הרכבים. כדאי לבדוק שעה לפני' };
+  const n = f.news; if (!n) return null;
   const conf = n.lineups && n.lineups.h && n.lineups.a && n.lineups.h.confirmed && n.lineups.a.confirmed;
   const out = (n.items || []).filter(i => i.impact === 'high' || i.impact === 'medium').length;
-  return { ok: !!conf, txt: (conf ? '👥 הרכבים רשמיים ✅' : '👥 הרכב צפוי, לא סופי. כדאי לבדוק שעה לפני') + (out ? ' · 🚑 ' + out + ' חיסורים חשובים' : '') };
+  return { ok: !!conf, txt: (conf ? '👥 הרכבים רשמיים ✅' : '') + (out ? (conf ? ' · ' : '') + '🚑 ' + out + ' חיסורים חשובים' : '') };
 }
 function slipLegHtml(d, l, n, best) {
   const click = l.sport === 'f' ? "openMatchOf('" + d.date + "','" + String(l.id).replace(/'/g, '') + "')" : "openBB('" + d.date + "'," + l.id + ")";
-  return '<div class="slipLeg' + (l.res ? ' fin-' + l.res : '') + '" onclick="' + click + '"><span class="rank">' + n + '</span><div class="slipMain"><div class="plabel">' + esc(l.label) + '</div><div class="pmeta">' + SPORT_ICON[l.sport] + ' ' + esc(l.game) + ' · ' + fmtTime(l.ts) + (new Date(l.ts * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }) > d.date ? ' 🌙 (בלילה, נספר ליום הזה)' : '') + (l.res ? ' · ' + RES[l.res][0] + (l.act ? ' (' + l.act + ')' : '') : '') + (best ? ' · <span class="bestTag">⭐ הכי בטוחה בטופס</span>' : '') + (() => { const u = lineupInfo(d, l); return u ? '<div class="luTag ' + (u.ok ? 'ok' : 'wait') + '">' + u.txt + '</div>' : ''; })() + '</div>' + '</div><span class="oddsTag">' + l.odds.toFixed(2) + '</span>' + (l.res || l.src === 'fivebet' ? '' : '<input class="siteOdds" type="number" step="0.01" min="1.01" inputmode="decimal" placeholder="יחס באתר שלך" value="' + esc(store.get('ciq-so-' + d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) || '') + '" data-k="' + esc(d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) + '" data-o="' + l.odds + '" onclick="event.stopPropagation()">') + '</div>';
+  return '<div class="slipLeg' + (l.res ? ' fin-' + l.res : '') + '" onclick="' + click + '"><span class="rank">' + n + '</span><div class="slipMain"><div class="plabel">' + esc(l.label) + '</div><div class="pmeta">' + SPORT_ICON[l.sport] + ' ' + esc(l.game) + ' · ' + fmtTime(l.ts) + (new Date(l.ts * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Jerusalem' }) > d.date ? ' 🌙 (בלילה, נספר ליום הזה)' : '') + (l.res ? ' · ' + RES[l.res][0] + (l.act ? ' (' + l.act + ')' : '') : '') + (best ? ' · <span class="bestTag">⭐ הכי בטוחה בטופס</span>' : '') + (() => { const u = lineupInfo(d, l); return u && u.txt ? '<div class="luTag ' + (u.ok ? 'ok' : 'wait') + '">' + u.txt + '</div>' : ''; })() + '</div>' + '</div><span class="oddsTag">' + l.odds.toFixed(2) + '</span>' + (l.res || l.src === 'fivebet' ? '' : '<input class="siteOdds" type="number" step="0.01" min="1.01" inputmode="decimal" placeholder="יחס באתר שלך" value="' + esc(store.get('ciq-so-' + d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) || '') + '" data-k="' + esc(d.date + '|' + l.sport + '|' + l.id + '|' + (l.key || l.mi)) + '" data-o="' + l.odds + '" onclick="event.stopPropagation()">') + '</div>';
 }
 function recalcSite(card) {
   const ins = [...card.querySelectorAll('.siteOdds')], el = card.querySelector('.siteTotal'); if (!el || !ins.length) return;
