@@ -365,7 +365,7 @@ function slipLegsHtml(d, S, bestLeg) {
 function slipCardHtml(d, S, title, sub, cls) {
   const prob = S.legs.reduce((a, l) => a * (l.p > 0 ? l.p : 0.6), 1), once = Math.max(2, Math.round(1 / prob)), whys = S.legs.filter(l => l.why), bestLeg = S.legs.some(l => l.p > 0) ? S.legs.reduce((a, l) => (l.p || 0) > (a.p || 0) ? l : a, S.legs[0]) : null;
   const sk = slipKey(d, S), pl = getPlay(sk);
-  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + (pl ? ' played' : '') + '" data-sk="' + esc(sk) + '"><h3>' + (title.startsWith('🏟') ? lgTagByLabel(title.slice(2).trim()) + title.slice(2).trim() : title) + ' <span class="muted">' + sub + '</span></h3>' + slipLegsHtml(d, S, bestLeg) +
+  return '<div class="card slipCard ' + cls + (S.res ? ' fin-' + S.res : '') + (pl ? ' played' : '') + '" data-sk="' + esc(sk) + '"><h3>' + (title.startsWith('🏟') ? lgTagByLabel(title.slice(2).trim()) + title.slice(2).trim() : title) + ' <span class="muted">' + sub + '</span></h3>' + (typeof liveSlipLine === 'function' ? liveSlipLine(S) : '') + slipLegsHtml(d, S, bestLeg) +
     (whys.length ? '<details class="legWhyBox"><summary>💡 למה בחרנו (' + whys.length + ')</summary><ul>' + whys.map(l => '<li><b>' + esc(l.label) + '</b> — ' + esc(l.why) + '</li>').join('') + '</ul></details>' : '') +
     '<div class="slipTotal"><span>יחס כולל (' + (S.src === 'fivebet' ? 'fivebet' : S.legs.every(l => l.est) ? 'משוער' : 'Bet365') + ')</span><b>' + S.total.toFixed(2) + '</b></div><button class="btn shareBtn" type="button" data-t="' + esc(slipShareText(d, S, title.replace(/^[^ ]+ /, ''))) + '">📤 שתף בוואטסאפ</button><div class="playRow"><label><input type="checkbox" class="playChk"' + (pl ? ' checked' : '') + '> שיחקתי את הטופס הזה</label><input class="playStake" type="number" min="1" inputmode="decimal" placeholder="סכום ב-₪" value="' + (pl ? pl.s : '') + '"></div><div class="siteTotal"></div>' + (S.res ? '<p class="muted slipFoot">' + (S.res === 'win' ? '<b class="pos">נתפס ✅</b>' : S.res === 'lose' ? '<b class="neg">נפל ❌</b>' : '') + '</p>' : '') + '</div>';
 }
@@ -469,6 +469,7 @@ async function fillToday(date) {
   if (sp !== 'f') html += '<div class="toolbar"><div class="stSeg"><button class="' + (want === 'rel' ? 'on' : '') + '" data-tstat="rel">⏳ רלוונטיים</button><button class="' + (want === 'now' ? 'on' : '') + '" data-tstat="now">🔴 בלייב' + (typeof liveCount === 'function' && liveCount() ? ' <b>' + liveCount() + '</b>' : '') + '</button><button class="' + (want === 'done' ? 'on' : '') + '" data-tstat="done">✅ נגמרו</button></div></div>';
   if (sp === 'f') {
     const n7 = recList(7).length, extras = [['rec', '🎯 הימורים להיום', 'ההימורים הבודדים החזקים של היום: ציון 7 ומעלה לפי החישוב שלנו', recRows(7), n7], ['games', '🗂 משחקים', 'כל משחקי היום לפי ליגה ושעה, כמו באפליקציית תוצאות. לחיצה על משחק פותחת ניתוח מלא.', gamesPaneHtml(cat), state.day.fixtures.length]];
+    if (want === 'now' && typeof liveSummary === 'function') html += liveSummary();
     html += slipsHtml(s, sp, cat, want, extras) || '<div class="empty">אין כאן עדיין כלום.</div>';
   } else html += state.tmode === 'slips' ? pSlips : pSing;
   box.innerHTML = html; saveUi();
