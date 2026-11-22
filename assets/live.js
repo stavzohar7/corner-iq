@@ -35,11 +35,11 @@
     const cur = group === 'total' ? v[0] + v[1] : group === 'home' ? v[0] : group === 'away' ? v[1] : null;
     const R = { g: [e.h, e.a], stats: { c: e.c, sh: e.sh, sot: e.sot } }, now = typeof gradeRec === 'function' ? gradeRec(key, { result: R }) : null;
     if (cur != null && line != null) {
-      if (side === 'over' && cur > line) return { txt: 'כרגע ' + cur + ' מתוך קו ' + line + ' · כבר עבר', cls: 'ok' };
-      if (side === 'under' && cur > line) return { txt: 'כרגע ' + cur + ' מתוך קו ' + line + ' · נפל', cls: 'bad' };
-      return { txt: 'כרגע ' + cur + ' מתוך קו ' + line + (now === 'win' ? ' · עובר כרגע' : ' · עוד לא עובר'), cls: now === 'win' ? 'ok2' : 'wait' };
+      if (side === 'over' && cur > line) return { txt: 'כרגע ' + cur + ' מתוך ' + line + ' · נתפס ✅', cls: 'ok' };
+      if (side === 'under' && cur > line) return { txt: 'כרגע ' + cur + ' מתוך ' + line + ' · נפל ❌', cls: 'bad' };
+      return { txt: 'כרגע ' + cur + ' מתוך ' + line + (now === 'win' ? ' · נתפס כרגע' : ' · עוד לא נתפס'), cls: now === 'win' ? 'ok2' : 'wait' };
     }
-    return { txt: 'כרגע ' + e.h + ':' + e.a + (now === 'win' ? ' · עובר כרגע' : now === 'lose' ? ' · לא עובר כרגע' : ''), cls: now === 'win' ? 'ok2' : now === 'lose' ? 'bad2' : 'wait' };
+    return { txt: 'כרגע ' + e.h + ':' + e.a + (now === 'win' ? ' · נתפס כרגע' : now === 'lose' ? ' · לא נתפס כרגע' : ''), cls: now === 'win' ? 'ok2' : now === 'lose' ? 'bad2' : 'wait' };
   }
   const chip = (key, f) => { const e = L.map.get(String(f.id)); if (!e) return ''; const s = status(key, e); return '<div class="liveChip ' + s.cls + '"><span class="ldot"></span>' + (e.minute ? e.minute + ' · ' : '') + s.txt + '</div>'; };
   window.liveChip = (r, f) => chip(r.key, f);
