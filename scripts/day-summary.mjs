@@ -23,7 +23,8 @@ const money = S => S.res === 'win' ? (S.total - 1) * 100 : S.res === 'lose' ? -1
 const slipStats = list => { const o = { n: list.length, w: 0, l: 0, p: 0, profit: 0 }; for (const S of list) { if (S.res === 'win') o.w++; else if (S.res === 'lose') o.l++; else o.p++; o.profit += money(S); } o.profit = Math.round(o.profit); return o; };
 const slips = rj('data/slips.json', { days: [] }), I = rj('data/days/index.json', { days: [], picksLog: [] });
 const dates = [...new Set([...slips.days.map(d => d.date), ...(I.days || []).map(d => d.date)])].sort().reverse();
-const out = [];
+const out = [], betlog = [];
+const resOf = r => r && String(r).includes('win') ? 'w' : r && String(r).includes('lose') ? 'l' : r ? 'p' : null;
 for (const date of dates) {
   const sd = slips.days.find(x => x.date === date), k = sd && sd.k || {};
   const fS = [k.strong && k.strong.f, k.second && k.second.f, ...(k.win || []), ...(k.lg || [])].filter(S => S && S.legs && S.legs.length);
@@ -40,8 +41,14 @@ for (const date of dates) {
     const L = (I.picksLog || []).filter(e => e.d === date); if (L.length) sg.src = 'old';
     for (const e of L) { if (inSlipLbl.has(String(e.id) + '|' + clean(e.label))) continue; sg.n++; if (e.res && e.res.includes('win')) sg.w++; else if (e.res && e.res.includes('lose')) sg.l++; else if (e.res) sg.p++; else sg.pend++; }
   }
+  // יומן הימורים מלא: כל רגל בטפסים (פעם אחת לכל משחק+הימור) וגם הימורים בודדים (ציון 7 ומעלה) שלא בטפסים
+  { const seen = new Set(), lgOf = id => { const f = day && (day.fixtures || []).find(x => String(x.id) === String(id)); return f ? f.lg : null; };
+    for (const S of fS) for (const l of S.legs) { const k = l.id + '|' + l.key; if (seen.has(k)) continue; seen.add(k); betlog.push({ d: date, sp: 'f', lg: l.lg || lgOf(l.id), k: l.key, o: l.odds, r: resOf(l.res), s: 1, g: clean(l.game) }); }
+    if (fb && fb.recs && day) for (const r of fb.recs) { if (r.odds < 1.4 || (r.sc || 6) < 7) continue; const k = r.id + '|' + r.key; if (seen.has(k)) continue; const f = (day.fixtures || []).find(x => String(x.id) === String(r.id)); if (!f) continue; seen.add(k); betlog.push({ d: date, sp: 'f', lg: f.lg, k: r.key, o: r.odds, r: f.result ? resOf(gradeRec(r.key, f.result)) : null, s: 0, g: clean(f.home.name) + ' – ' + clean(f.away.name) }); }
+    const seenB = new Set(); for (const sp of ['n', 'e']) for (const S of [k.strong && k.strong[sp], k.second && k.second[sp]]) if (S && S.legs) for (const l of S.legs) { const kk = l.id + '|' + l.key; if (seenB.has(kk)) continue; seenB.add(kk); betlog.push({ d: date, sp, lg: sp === 'n' ? 103 : 569, k: l.key, o: l.odds, r: resOf(l.res), s: 1, g: clean(l.game) }); } }
   if (!fS.length && !bS.length && !sg.n) continue;
   out.push({ date, f: { slips: slipStats(fS), singles: sg }, b: { slips: slipStats(bS) } });
 }
+fs.writeFileSync(path.join(ROOT, 'data', 'betlog.json'), JSON.stringify({ updated: new Date().toISOString(), bets: betlog }));
 fs.writeFileSync(path.join(ROOT, 'data', 'daysummary.json'), JSON.stringify({ updated: new Date().toISOString(), days: out }));
 console.log('סיכום ימים:', out.length, 'ימים');

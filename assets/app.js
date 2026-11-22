@@ -269,6 +269,17 @@ function recapHtml(date) {
   return '<details class="card recap"><summary><b>📊 מה קרה ' + (d.date === addDays(ilToday(), -1) ? 'אתמול' : 'ב' + fmtDay(d.date)) + '</b> <span class="muted">· ' + (done.length ? win + ' מתוך ' + done.length + ' טפסים נתפסו' + (rows.length > done.length ? ' · ' + (rows.length - done.length) + ' עוד ממתינים' : '') + ' · <b class="' + moneyCls(money) + '">' + fmtMoney(money) + '</b>' : 'עדיין ממתינים לתוצאות') + '</span></summary>' +
     '<div class="recapRows">' + rows.map(([n, X]) => '<div class="recapRow ' + (X.res ? 'fin-' + X.res : '') + '"><div class="rhead"><span>' + (X.res === 'win' ? '✅' : X.res === 'lose' ? '❌' : '⏳') + ' <b>' + esc(n) + '</b></span><span class="muted">יחס ' + X.total.toFixed(2) + '</span></div><div class="rlegs">' + X.legs.map(l => (l.res === 'win' ? '✅ ' : l.res === 'lose' ? '❌ ' : l.res === 'push' ? '↩ ' : '⏳ ') + esc(l.label) + (l.act ? ' <span class="muted">(' + esc(l.act) + ')</span>' : '')).join('<br>') + '</div></div>').join('') + '</div></details>';
 }
+// משחקי הלילה (אחרי חצות) שייכים ליום הקודם: מציגים תזכורת עם כפתור, כדי שהטפסים שלהם לא "ייעלמו"
+function nightBanner() {
+  const t = ilToday(); if (!state.day || state.day.date !== t || !state.slips) return '';
+  const y = addDays(t, -1), sd = (state.slips.days || []).find(d => d.date === y); if (!sd || !sd.k) return '';
+  const now = Date.now() / 1000, sl = [];
+  for (const lv of ['strong', 'second']) for (const sp of ['f', 'n', 'e']) { const S = sd.k[lv] && sd.k[lv][sp]; if (S && S.legs && S.legs.length && !S.res && S.legs.some(l => l.ts + 3 * 3600 > now)) sl.push(sp); }
+  for (const w of [...(sd.k.win || []), ...(sd.k.lg || [])]) if (w.legs && w.legs.length && !w.res && w.legs.some(l => l.ts + 3 * 3600 > now)) sl.push('f');
+  if (!sl.length) return '';
+  const hasBb = sl.some(x => x !== 'f');
+  return '<div class="card nightB">🌙 ' + (sl.length === 1 ? 'יש טופס אחד שעוד פתוח' : 'יש ' + sl.length + ' טפסים שעוד פתוחים') + ' ממשחקי הלילה' + (hasBb ? ' (כולל כדורסל)' : '') + '. משחקים שאחרי חצות נחשבים ליום הקודם. <button class="btn" data-day="' + y + '">פתח את ' + fmtShort(y) + '</button></div>';
+}
 function bindDayChips() { document.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { $('#daySel').value = b.dataset.day; loadDay(b.dataset.day); }); }
 async function openMatchOf(date, id) {
   if (state.day.date !== date) { $('#daySel').value = date; await loadDay(date); }
@@ -521,7 +532,7 @@ function singleRow(f, m, i, noLg) {
 function renderToday() {
   const el = $('#view-today'), d = state.day;
   const isLatest = state.day.date === state.index.days[0].date, sunday = isLatest && new Date(ilToday() + 'T00:00:00Z').getUTCDay() === 0;
-  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + dayChips() + heroPick() + '<div id="todayBody"><div class="empty">טוען...</div></div>' + daySummary(state.day.date) + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + GUIDE;
+  el.innerHTML = '<h2>🏆 ' + dayName(state.day.date) + ' <span class="muted h2d">' + fmtDay(state.day.date) + '</span></h2>' + dayChips() + nightBanner() + heroPick() + '<div id="todayBody"><div class="empty">טוען...</div></div>' + daySummary(state.day.date) + recapHtml(state.day.date) + (sunday ? weekHtml(addDays(weekStartOf(ilToday()), -7), true) : '') + GUIDE;
   bindDayChips(); fillToday(d.date);
 }
 function keyMatchesHtml(d) {
@@ -1084,7 +1095,7 @@ function weekHtml(ws, compact) {
   return html + '</div>';
 }
 const trTab = () => state.trSub || 'slips', hid = k => trTab() === k ? '' : ' hidden';
-const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['learn', '🧠 מה למדנו'], ['days', '📆 לפי יום'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
+const trNav = () => subNav([['slips', '💰 הטפסים שלי'], ['singles', '🎯 המלצות בודדות'], ['learn', '🧠 מה למדנו'], ['days', '📆 לפי יום'], ['analysis', '📈 מה אנחנו תופסים'], ['week', '📅 סיכום שבועי'], ['recs', '🏟 לפי ליגה'], ['list', '🗂 כל ההמלצות']], trTab(), 'trsub');
 function weekPanel() {
   const wl = weekList(); if (!wl.length) return '<div class="empty">עוד אין נתונים לסיכום.</div>';
   const cur = state.wk === 'all' || (state.wk && wl.includes(state.wk)) ? state.wk : wl[0];
@@ -1134,6 +1145,36 @@ function splitPanel() {
     '<div class="card"><h4>⚽ כדורגל לפי סוג הימור</h4><div class="tblWrap"><table>' + head('סוג הימור') + '<tbody>' + tk.map(t => line(TYPE_NAME[t] || t, typeRows[t])).join('') + '</tbody></table></div></div>';
 }
 // "מה למדנו מהתוצאות": הלקחים שהמערכת מחשבת לבד מכל ההימורים שנגמרו
+// ניתוח כל ההימורים מאז שהתחלנו: סינון לפי ענף, סוג הימור, ליגה ומקור (בטפסים / מחוץ לטפסים)
+const KIND_HE = { g: 'שערים', c: 'קרנות', c1: 'קרנות במחצית', sh: 'בעיטות', sot: 'בעיטות למסגרת' }, GRP_HE = { total: 'סך המשחק', home: 'קבוצת הבית', away: 'קבוצת החוץ', ah: 'הנדיקאפ', '1x2': 'מנצחת', dc: 'לא מפסידה', btts: 'שתי הקבוצות כובשות', combo: 'שילוב' }, SD_HE = { over: 'מעל', under: 'מתחת' };
+function betKind(b) { const p = String(b.k).split('|');
+  if (b.sp === 'f') { const st = KIND_HE[p[0]] || p[0], gr = GRP_HE[p[1]] || p[1]; return (['1x2', 'dc', 'btts', 'combo'].includes(p[1]) ? (p[0] === 'c' ? 'קרנות · ' : '') + gr : st + ' · ' + gr + (SD_HE[p[2]] ? ' · ' + SD_HE[p[2]] : '')); }
+  if (p[0] === 'pst') return 'שחקן · ' + ({ pts: 'נקודות', reb: 'ריבאונדים', ast: 'אסיסטים', tpm: 'שלשות', pra: 'נקודות+ריבאונדים+אסיסטים' }[p[2]] || p[2]) + ' · ' + (SD_HE[p[3]] || '');
+  if (p[0] === 'ts') return 'קבוצה · ' + ({ tpm: 'שלשות', reb: 'ריבאונדים', ast: 'אסיסטים' }[p[1]] || p[1]) + ' · ' + (SD_HE[p[3]] || '');
+  if (/^(q1|h1)$/.test(p[0])) return (p[0] === 'q1' ? 'רבע ראשון' : 'מחצית ראשונה') + ' · ' + (p[1] === 'total' ? 'סך נקודות ' + (SD_HE[p[2]] || '') : 'הנדיקאפ');
+  return ({ ml: 'ניצחון', spread: 'הנדיקאפ', total: 'סך נקודות', th: 'נקודות קבוצת הבית', ta: 'נקודות קבוצת החוץ' }[p[0]] || p[0]) + (SD_HE[p[1]] ? ' · ' + SD_HE[p[1]] : ''); }
+async function fillAnalysis() {
+  const box = $('#anBox'); if (!box) return;
+  let D; try { D = await getJson('data/betlog.json'); } catch (e) { box.innerHTML = '<div class="empty">עוד אין יומן הימורים.</div>'; return; }
+  const F = state.an = Object.assign({ sp: 'all', cat: 'all', lg: 'all', src: 'all' }, state.an || {});
+  const all = (D.bets || []).map(b => ({ ...b, kind: betKind(b), cat: b.sp === 'f' ? catOfKey(b.k) : null }));
+  const lgName = (sp, id) => sp === 'f' ? (state.index && (state.index.leagues || []).find(l => l.id === id) || (state.day && (state.day.leagues || []).find(l => l.id === id)) || { he: String(id) }).he : (id === 103 ? 'NBA' : 'יורוליג');
+  const pick = all.filter(b => (F.sp === 'all' || (F.sp === 'f' ? b.sp === 'f' : b.sp !== 'f')) && (F.cat === 'all' || b.cat === F.cat) && (F.lg === 'all' || String(b.lg) === String(F.lg)) && (F.src === 'all' || (F.src === 'slip' ? b.s === 1 : b.s === 0)));
+  const dec = pick.filter(b => b.r === 'w' || b.r === 'l'), w = dec.filter(b => b.r === 'w').length;
+  const grp = (keyFn, nameFn) => { const o = {}; for (const b of pick) { const k = keyFn(b), x = o[k] = o[k] || { w: 0, l: 0, p: 0, n: 0, od: 0 }; x.n++; x.od += b.o; if (b.r === 'w') x.w++; else if (b.r === 'l') x.l++; else x.p++; } return Object.entries(o).map(([k, x]) => ({ k, name: nameFn(k), ...x, dn: x.w + x.l })).sort((a, b) => b.dn - a.dn || b.n - a.n); };
+  const bar = x => x.dn ? '<div class="anBar" title="' + x.w + ' מתוך ' + x.dn + '"><i style="width:' + Math.round(100 * x.w / x.dn) + '%"></i></div>' : '<span class="muted">—</span>';
+  const tbl = (title, rows, first) => rows.length ? '<h4 class="secSub">' + title + '</h4><div class="tblWrap"><table><thead><tr><th>' + first + '</th><th class="num">נתפסו</th><th class="num">נפלו</th><th class="num">ממתינים</th><th>איך זה הולך</th><th class="num">יחס ממוצע</th></tr></thead><tbody>' + rows.map(x => '<tr><td>' + esc(x.name) + '</td><td class="num"><b>' + x.w + '</b></td><td class="num">' + x.l + '</td><td class="num">' + (x.p) + '</td><td>' + bar(x) + '</td><td class="num">' + (x.n ? (x.od / x.n).toFixed(2) : '') + '</td></tr>').join('') + '</tbody></table></div>' : '';
+  const sps = [['all', 'הכל'], ['f', '⚽ כדורגל'], ['b', '🏀 כדורסל']], srcs = [['all', 'הכל'], ['slip', 'בתוך טפסים'], ['single', 'מחוץ לטפסים']];
+  const lgs = [...new Set(all.filter(b => F.sp === 'all' || (F.sp === 'f' ? b.sp === 'f' : b.sp !== 'f')).map(b => b.sp + ':' + b.lg))].map(s => { const [sp, id] = s.split(':'); return [id, lgName(sp, sp === 'f' ? +id : +id)]; });
+  const chips = (arr, cur, key) => '<div class="chips">' + arr.map(([k, n]) => '<button class="chip' + (String(cur) === String(k) ? ' on' : '') + '" data-an="' + key + '" data-v="' + k + '">' + n + '</button>').join('') + '</div>';
+  box.innerHTML = '<div class="card"><h4>📈 מה אנחנו תופסים</h4><p class="sub2">כל ההימורים מאז שהתחלנו: אלה שהיו בתוך טפסים, ואלה בציון 7 ומעלה שלא היו בטפסים. כל הימור נספר פעם אחת ליום גם אם הופיע בכמה טפסים. הסינון משנה את הטבלאות.</p>' +
+    '<div class="anF"><span>ענף</span>' + chips(sps, F.sp, 'sp') + '</div><div class="anF"><span>מקור</span>' + chips(srcs, F.src, 'src') + '</div>' +
+    (F.sp !== 'b' ? '<div class="anF"><span>סוג הימור</span>' + chips([['all', 'הכל'], ...BET_CATS.map(c => [c[0], c[1] + ' ' + c[2]])], F.cat, 'cat') + '</div>' : '') +
+    '<div class="anF"><span>ליגה</span>' + chips([['all', 'כל הליגות'], ...lgs], F.lg, 'lg') + '</div>' +
+    '<div class="kpis"><div class="kpi"><b>' + pick.length + '</b><span>הימורים</span></div><div class="kpi"><b class="pos">' + w + '</b><span>נתפסו ✅</span></div><div class="kpi"><b class="neg">' + (dec.length - w) + '</b><span>נפלו ❌</span></div><div class="kpi"><b>' + (dec.length ? w + ' מתוך ' + dec.length : '—') + '</b><span>מתוך שנגמרו</span></div></div></div>' +
+    '<div class="card">' + tbl('לפי סוג הימור', grp(b => b.kind, k => k), 'סוג') + tbl('לפי ליגה', grp(b => b.sp + ':' + b.lg, k => { const [sp, id] = k.split(':'); return lgName(sp, +id); }), 'ליגה') + tbl('לפי יום', grp(b => b.d, k => fmtShort(k)).sort((a, b) => b.k.localeCompare(a.k)), 'יום') + '</div>';
+  box.querySelectorAll('[data-an]').forEach(b => b.onclick = () => { state.an[b.dataset.an] = b.dataset.v; if (b.dataset.an === 'sp') { state.an.cat = 'all'; state.an.lg = 'all'; } fillAnalysis(); });
+}
 // סיכום לפי יום: טפסים (תיאורטית 100 ₪ לכל טופס) והימורים בודדים שלא נכנסו לטפסים, כדורגל וכדורסל בעמודות נפרדות
 async function fillDays() {
   const box = $('#daysBox'); if (!box) return;
@@ -1174,7 +1215,7 @@ function singlesPanel() {
 function renderTrack() {
   const el = $('#view-track'), log = (state.index.picksLog || []).slice().sort((a, b) => b.ts - a.ts);
   if (state.tlg && state.tlg !== 'all') { renderLeagueView(el); return; }
-  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="learn"' + hid('learn') + '><div id="learnBox"><div class="empty">טוען...</div></div></section><section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="days"' + hid('days') + '><div id="daysBox"><div class="empty">טוען...</div></div></section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '>' + splitPanel() + '<p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
+  let html = '<h2>📊 מעקב</h2>' + trNav() + '<section data-tp="learn"' + hid('learn') + '><div id="learnBox"><div class="empty">טוען...</div></div></section><section data-tp="singles"' + hid('singles') + '>' + singlesPanel() + '</section><section data-tp="analysis"' + hid('analysis') + '><div id="anBox"><div class="empty">טוען...</div></div></section><section data-tp="days"' + hid('days') + '><div id="daysBox"><div class="empty">טוען...</div></div></section><section data-tp="week"' + hid('week') + '>' + weekPanel() + '</section><section data-tp="slips"' + hid('slips') + '><div id="slipHist"></div></section><section data-tp="recs"' + hid('recs') + '>' + splitPanel() + '<p class="lead" hidden>כל ההמלצות הנבחרות של כל יום נבדקות אחרי שהמשחק נגמר: נתפס, נפל או החזר. התוצאות מתעדכנות במהלך היום (בערך כל חצי שעה). כאן רואים את כל ההיסטוריה והסיכומים.</p>';
   { // ⚽ כדורגל לפי ליגה: איפה ההמלצות עובדות יותר ואיפה פחות (כל ההמלצות על משחקים, לא רק הנבחרות של היום)
     const D = state.index.detail || {}, byLg = D.byLeague || {}, byLT = D.byLeagueType || {};
     const dn = x => x.win + x.lose, keys = Object.keys(byLg).filter(k => dn(byLg[k]) > 0).sort((x, y) => (byLg[y].win / dn(byLg[y])) - (byLg[x].win / dn(byLg[x])) || dn(byLg[y]) - dn(byLg[x]));
@@ -1212,7 +1253,7 @@ function renderTrack() {
     list.map(e => { const r = e.res ? RES[e.res] : null, st = statusOfLog(e); return '<tr class="clk" onclick="openMatchOf(\'' + e.d + '\',\'' + String(e.id).replace(/'/g, '') + '\')"><td>' + fmtShort(e.d) + '</td><td>' + bd(e.h) + ' – ' + bd(e.a) + '</td><td>' + (TYPE_NAME[e.t] || '').split(' ')[0] + ' ' + esc(e.label) + '</td><td class="num"><span class="score ' + scoreCls(e.score) + '">' + e.score + '</span></td><td class="num">' + (e.price ? e.price.toFixed(2) : '—') + '</td><td class="num">' + (r ? '<span class="res ' + r[1] + '">' + r[0] + '</span>' : st === 'upcoming' ? '🕒 ' + fmtTime(e.ts) : '⏳') + '</td><td>' + esc(e.act || '') + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="muted" style="margin-top:10px">אין המלצות במצב הזה.</p>') + '</div>';
   html += '</section>';
   el.innerHTML = html;
-  fillSlipHist(); fillLearn(); fillDays();
+  fillSlipHist(); fillLearn(); fillDays(); fillAnalysis();
   bindSf(renderTrack);
   el.querySelectorAll('[data-trsub]').forEach(b => b.onclick = () => { state.trSub = b.dataset.trsub; renderTrack(); });
   el.querySelectorAll('[data-wk]').forEach(b => b.onclick = () => { state.wk = b.dataset.wk; renderTrack(); });

@@ -7,7 +7,7 @@ const git = (...a) => spawnSync('git', a, { cwd: ROOT, encoding: 'utf8', windows
 if (!git('remote', 'get-url', 'origin').stdout.trim()) { console.log('אין remote ל-git, מדלג על הפרסום'); process.exit(0); }
 try { spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'day-summary.mjs')], { cwd: ROOT, windowsHide: true }); } catch (e) { /* בלי סיכום */ }
 git('add', '-A', '--', 'index.html', 'manifest.webmanifest', 'assets', 'scripts', '.github', 'README.md', '.gitignore');
-git('add', '-f', '--', 'data/days', 'data/fbodds', 'data/bball', 'data/latest.json', 'data/stats.json', 'data/slips.json', 'data/daysummary.json', 'data/teams.json', 'data/lessons.json', 'data/notify-state.json');
+git('add', '-f', '--', 'data/days', 'data/fbodds', 'data/bball', 'data/latest.json', 'data/stats.json', 'data/slips.json', 'data/daysummary.json', 'data/betlog.json', 'data/teams.json', 'data/lessons.json', 'data/notify-state.json');
 if (git('diff', '--cached', '--quiet').status === 0) { console.log('אין שינויים לפרסום'); process.exit(0); }
 const c = git('commit', '-m', 'עדכון אוטומטי ' + new Date().toISOString().slice(0, 16));
 if (c.status !== 0) { console.error(c.stderr); process.exit(1); }
