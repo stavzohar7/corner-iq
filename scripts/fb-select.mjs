@@ -217,13 +217,17 @@ function bandPick(pool, avoidGames = new Set(), maxGames = 4) {
   }
   return [];
 }
-let strong = bandPick(cands); 
+// יום ליגת האלופות: טפסי חזק/שני רק מליגת האלופות של 22:00; טופס 19:45 נפרד (קבוע); שאר הליגות בטפסים נפרדים (שעות + טופס ליגה)
+const UCL = 2, uclDay = matched.some(m => Number(m.f.lg) === UCL && m.f.ts * 1000 > Date.now());
+const lateUcl = c => Number(c.f.lg) === UCL && ilMin(c.f.ts) >= 21 * 60 + 30;
+const mainPool = uclDay ? cands.filter(lateUcl) : cands;
+let strong = bandPick(mainPool);
 if (strong.length) { spec.strong.f = strong.map(toLeg); seen.add(sigOf(strong)); }
 const strongGames = new Set(strong.map(gid));
-let second = bandPick(cands, strongGames);
+let second = bandPick(mainPool, strongGames);
 if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second)); }
 // טפסי שעות: צברים של עד שעה וחצי בין תחילות המשחקים
-{ const fx = [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].filter(f => f.ts * 1000 > Date.now()).sort((a, b) => a.ts - b.ts);
+{ const fx = [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].filter(f => f.ts * 1000 > Date.now() && !(uclDay && Number(f.lg) === UCL)).sort((a, b) => a.ts - b.ts);   // ביום אלופות: ליגת האלופות רק בטפסים הקבועים (19:45 / 22:00)
   const starts = [...new Set(fx.map(f => f.ts))], usedG = new Set(), tsOf = new Map(fx.map(f => [String(f.id), f.ts]));
   // כל משחק מופיע בטופס שעות אחד בלבד (בלי הימורים או משחקים שחוזרים בין טפסים)
   for (const st of [...starts, ...starts]) { const ids = new Set(fx.filter(f => f.ts >= st && f.ts - st <= 60 * 60).map(f => String(f.id)).filter(x => !usedG.has(x)));
@@ -231,14 +235,16 @@ if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second));
     const L = bandPick(cands.filter(c => ids.has(gid(c)))); if (!L.length) continue;
     const gs = [...new Set(L.map(gid))]; gs.forEach(x => usedG.add(x)); seen.add(sigOf(L));
     const tm = gs.map(x => ilMin(tsOf.get(x))), a = Math.min(...tm), b = Math.max(...tm);
-    spec.win.push({ label: a === b ? 'משחקי ' + hhmm(a) : 'משחקי ' + hhmm(a) + '–' + hhmm(b), legs: L.map(toLeg) }); } }
+    spec.win.push({ label: (uclDay ? 'ליגות אחרות · ' : '') + (a === b ? 'משחקי ' + hhmm(a) : 'משחקי ' + hhmm(a) + '–' + hhmm(b)), legs: L.map(toLeg) }); } }
+{ const cnt = {}; for (const w of spec.win) { cnt[w.label] = (cnt[w.label] || 0) + 1; if (cnt[w.label] > 1) w.label += ' (' + cnt[w.label] + ')'; } }
 spec.win.sort((x, y) => x.label.localeCompare(y.label));
 // טפסים קבועים: בונדסליגה שבת 16:30, פרמייר ליג שבת 17:00
 for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' }, { lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' },
   { lg: 2, from: 19 * 60 + 15, to: 20 * 60 + 15, label: 'ליגת האלופות · משחקי 19:45' }, { lg: 2, from: 21 * 60 + 30, to: 22 * 60 + 30, label: 'ליגת האלופות · משחקי 22:00' }]) {
-  const poolR = cands.filter(c => Number(c.f.lg) === R.lg && (!R.dow || ilDow(c.f.ts) === R.dow) && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to); let L = bandPick(poolR); if (!L.length && poolR.length) { globalThis.__TRIPLE = true; L = bandPick(poolR); globalThis.__TRIPLE = false; } if (L.length) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
+  const poolR = cands.filter(c => Number(c.f.lg) === R.lg && (!R.dow || ilDow(c.f.ts) === R.dow) && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to); let L = bandPick(poolR); if (!L.length && poolR.length) { globalThis.__TRIPLE = true; L = bandPick(poolR); globalThis.__TRIPLE = false; } if (L.length && !seen.has(sigOf(L))) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
 // טופס חזק לכל ליגה (גם אם יש רק שלושה משחקים; בליגה עם פחות משלושה משחקים משלימים מהימור שני באותו משחק)
 for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
+  if (uclDay && lg === UCL) continue;
   const L = bandPick(cands.filter(c => Number(c.f.lg) === lg)); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
   const info = LEAGUES.find(l => l.id === lg); spec.fixed.push({ kind: 'league', label: (info ? info.he : 'ליגה ' + lg) + ' · כל משחקי היום', legs: L.map(toLeg) }); }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.stringify(spec, null, 1));
