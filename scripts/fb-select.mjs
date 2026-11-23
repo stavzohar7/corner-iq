@@ -230,8 +230,9 @@ if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second));
     spec.win.push({ label: a === b ? 'משחקי ' + hhmm(a) : 'משחקי ' + hhmm(a) + '–' + hhmm(b), legs: L.map(toLeg) }); } }
 spec.win.sort((x, y) => x.label.localeCompare(y.label));
 // טפסים קבועים: בונדסליגה שבת 16:30, פרמייר ליג שבת 17:00
-for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' }, { lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' }]) {
-  const L = bandPick(cands.filter(c => Number(c.f.lg) === R.lg && ilDow(c.f.ts) === R.dow && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to)); if (L.length) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
+for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' }, { lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' },
+  { lg: 2, from: 19 * 60 + 15, to: 20 * 60 + 15, label: 'ליגת האלופות · משחקי 19:45' }, { lg: 2, from: 21 * 60 + 30, to: 22 * 60 + 30, label: 'ליגת האלופות · משחקי 22:00' }]) {
+  const L = bandPick(cands.filter(c => Number(c.f.lg) === R.lg && (!R.dow || ilDow(c.f.ts) === R.dow) && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to)); if (L.length) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
 // טופס חזק לכל ליגה (גם אם יש רק שלושה משחקים; בליגה עם פחות משלושה משחקים משלימים מהימור שני באותו משחק)
 for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
   const L = bandPick(cands.filter(c => Number(c.f.lg) === lg)); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
