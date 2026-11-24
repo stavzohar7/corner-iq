@@ -270,11 +270,19 @@ for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, lab
   const poolR = cands.filter(c => notUsed(c) && Number(c.f.lg) === R.lg && (!R.dow || ilDow(c.f.ts) === R.dow) && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to); let L = bandPick(poolR); if (!L.length && poolR.length) { globalThis.__TRIPLE = true; L = bandPick(poolR); globalThis.__TRIPLE = false; } if (L.length && !seen.has(sigOf(L))) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); markUsed(L); } }
 // מפעלי אירופה: טופס חזק לכל מפעל בכל שעה (19:45 ו-22:00), כל מפעל בנפרד. במפעל הראשי טפסי 22:00 הם החזק והשני (בלי העתק נוסף)
 if (cupDay) spec.labels = { strong: MAIN.he + ' · משחקי 22:00', second: MAIN.he + ' · משחקי 22:00' };
+// כמה טפסים בכל שעה: לא מתקמצנים. לפי מספר המשחקים בשעה: 5+ משחקים עד 3 טפסים, 2-4 משחקים עד 2, משחק אחד טופס אחד. כל טופס נוסף בנוי מהימורים שעוד לא נבחרו (בלי כפילויות), ובעדיפות למשחקים שעוד לא הופיעו בטופס של אותה שעה.
 for (const C of activeCups) for (const S of SLOTS) {
-  if (C === MAIN && S.label === '22:00' && cands.filter(lateMain).length >= 6) continue;
-  const poolC = cands.filter(c => notUsed(c) && Number(c.f.lg) === C.lg && ilMin(c.f.ts) >= S.from && ilMin(c.f.ts) <= S.to); if (!poolC.length) continue;
-  let L = bandPick(poolC); if (!L.length) { globalThis.__TRIPLE = true; L = bandPick(poolC); globalThis.__TRIPLE = false; } if (!L.length) { globalThis.__TRIPLE = true; L = bandPick(poolC, new Set(), 4, 1); globalThis.__TRIPLE = false; }
-  if (L.length) { spec.fixed.push({ label: C.he + ' · משחקי ' + S.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); markUsed(L); } }
+  const inSlot = c => Number(c.f.lg) === C.lg && ilMin(c.f.ts) >= S.from && ilMin(c.f.ts) <= S.to, nGames = new Set(cands.filter(inSlot).map(gid)).size;
+  if (!nGames) continue;
+  const mainLate = C === MAIN && S.label === '22:00' && cands.filter(lateMain).length >= 6;   // שם החזק והשני כבר שני טפסים
+  const target = nGames >= 5 ? 3 : nGames >= 2 ? 2 : 1; let have = mainLate ? 2 : 0, slotGames = new Set(mainLate ? [...strong, ...second].map(gid) : []);
+  for (let n = have; n < target; n++) {
+    const pool = cands.filter(c => notUsed(c) && inSlot(c)); if (!pool.length) break;
+    const pick = avoid => { let L = bandPick(pool, avoid); if (!L.length) { globalThis.__TRIPLE = true; L = bandPick(pool, avoid); globalThis.__TRIPLE = false; } if (!L.length && !avoid.size) { globalThis.__TRIPLE = true; L = bandPick(pool, new Set(), 4, 1); globalThis.__TRIPLE = false; } return L; };
+    let L = slotGames.size ? pick(slotGames) : []; if (!L.length) L = pick(new Set());
+    if (!L.length || seen.has(sigOf(L))) break;
+    spec.fixed.push({ label: C.he + ' · משחקי ' + S.label + (n > 0 ? ' (' + (n + 1) + ')' : ''), legs: L.map(toLeg) }); seen.add(sigOf(L)); markUsed(L); L.forEach(c => slotGames.add(gid(c))); }
+}
 // טופס חזק לכל ליגה (גם אם יש רק שלושה משחקים; בליגה עם פחות משלושה משחקים משלימים מהימור שני באותו משחק)
 for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
   if (cupDay && CUP_LG.has(lg)) continue;
