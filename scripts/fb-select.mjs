@@ -133,7 +133,7 @@ function whyOf(c) {
   return out.slice(0, 4).join(' ');
 }
 const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: (pb => pb >= 0.84 ? 10 : pb >= 0.78 ? 9 : pb >= 0.72 ? 8 : pb >= 0.64 ? 7 : 6)(c.pb), fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: whyOf(c) });
-if (process.env.FB_DEBUG) { const m = {}; for (const c of cands) { const k = c.f.home.name + '-' + c.f.away.name; (m[k] = m[k] || []).push(c); } for (const [k, L] of Object.entries(m)) if (/גלאטסראיי|בודו/.test(k)) console.log(k, L.length, 'pb>=.6:', L.filter(c => c.pb >= 0.6).length, L.filter(c => c.pb >= 0.6 && c.odds >= 1.4).slice(0, 4).map(c => c.label + '@' + c.odds + ' pb' + c.pb + ' ev' + (c.pb * c.odds - 1).toFixed(2)).join(' ; ')); }
+if (process.env.FB_DEBUG) { const m = {}; for (const c of cands) { const k = c.f.home.name + '-' + c.f.away.name; (m[k] = m[k] || []).push(c); } for (const [k, L] of Object.entries(m)) if (new RegExp(process.env.FB_DEBUG === '1' ? 'XXXX' : process.env.FB_DEBUG).test(k)) console.log(k, L.length, 'pb>=.6:', L.filter(c => c.pb >= 0.6).length, L.filter(c => c.pb >= 0.55 && c.odds >= 1.2).sort((x, y) => y.pb - x.pb).slice(0, 14).map(c => c.label + '@' + c.odds + ' pb' + c.pb + ' ev' + (c.pb * c.odds - 1).toFixed(2)).join(' ; ')); }
 const total = L => Math.round(L.reduce((p, c) => p * c.odds, 1) * 100) / 100;
 console.log('FX', [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].sort((a, b) => a.ts - b.ts).map(f => hhmm(ilMin(f.ts)) + ' ' + f.home.name + '–' + f.away.name).join(' | '));
 const spec = { date, strong: {}, second: {}, win: [], fixed: [] }, seen = new Set(), sigOf = L => L.map(legSig).sort().join(',');
