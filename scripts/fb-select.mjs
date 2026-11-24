@@ -54,6 +54,24 @@ for (const G of games) {
   matched.push({ G, f });
 }
 
+let EXPERT = {}; try { EXPERT = readJson(path.join(ROOT, 'data', 'expert', date + '.json')); } catch (e) {}   // דעות המנתח על משחקים (take + adj לכל הימור)
+// ---------- למידת קבוצות: איך כל קבוצה באמת התנהגה מול הקו המדויק ----------
+// לכל קבוצה: המשחקים האחרונים שלה בבית ובחוץ מתוך מאגר המשחקים. לכל הימור (סך / קבוצה, שערים/קרנות/בעיטות) בודקים באיזה שיעור מהמשחקים האלה הקו עבר,
+// ומערבבים עם הסיכוי של המודל (משקל עד 0.3, גדל עם מספר המשחקים). כך קבוצה שתמיד חורגת מהצפי (או תמיד נשארת מתחתיו) מתוקנת לפי ההתנהגות האמיתית שלה.
+const TEAM_RECS = (() => { const by = new Map(); try { const all = Object.values(readJson(path.join(ROOT, 'data', 'cache', 'matches.json')).matches || {}).filter(r => r.g && r.g[0] != null && r.ts * 1000 < Date.now()).sort((x, y) => y.ts - x.ts);
+  for (const r of all) for (const [id, v] of [[r.h, 'h'], [r.a, 'a']]) { const k = String(id) + '|' + v, L = by.get(k) || by.set(k, []).get(k); if (L.length < 14) L.push(r); } } catch (e) {} return by; })();
+const statOf = (r, stat, side) => { const i = side === 'h' ? 0 : 1; if (stat === 'g') return r.g[i]; if (stat === 'c1') return r.h1 && r.h1.c ? r.h1.c[i] : null; const v = r.s && r.s[side === 'h' ? 'h' : 'a']; return v ? v[stat] : null; };
+const bothOf = (r, stat) => { const x = statOf(r, stat, 'h'), y = statOf(r, stat, 'a'); return x == null || y == null ? null : x + y; };
+function empRate(f, stat, grp, side, ln, hid, aid) {
+  if (!['g', 'c', 'c1', 'sh', 'sot'].includes(stat) || !['total', 'home', 'away'].includes(grp) || !['over', 'under'].includes(side) || !(ln >= 0)) return null;
+  const H = TEAM_RECS.get(String(hid) + '|h') || [], A = TEAM_RECS.get(String(aid) + '|a') || [], xs = [];
+  if (grp === 'total') { for (const r of H) xs.push(bothOf(r, stat)); for (const r of A) xs.push(bothOf(r, stat)); }
+  else if (grp === 'home') for (const r of H) xs.push(statOf(r, stat, 'h'));
+  else for (const r of A) xs.push(statOf(r, stat, 'a'));
+  const v = xs.filter(x => x != null && x !== ln); if (v.length < 6) return null;
+  const hit = v.filter(x => side === 'over' ? x > ln : x < ln).length; return { p: hit / v.length, n: v.length };
+}
+
 // ---------- הימורים ----------
 const cands = [];
 const hn = f => clean(f.home.name), an = f => clean(f.away.name);
@@ -65,7 +83,7 @@ for (const { G, f } of matched) {
   { const mw = f.character && f.character.mw, fp = mw ? Math.max(mw.h, mw.a) : 0;
     if (fp >= 0.75 && E.c && E.c.h != null) { const homeFav = mw.h >= mw.a, up = 1.5, dn = 1.1; E.c = { ...E.c, h: Math.max(0.5, E.c.h + (homeFav ? up : -dn)), a: Math.max(0.5, E.c.a + (homeFav ? -dn : up)) }; E.c.total = E.c.h + E.c.a; f.__dom = homeFav ? 'h' : 'a'; } } for (const st of ['g', 'c', 'c1', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
   const LGA = Object.fromEntries(["g", "c", "c1", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
-  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); 
+  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; let pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); { const xa = EXPERT[String(f.id)] && EXPERT[String(f.id)].adj && EXPERT[String(f.id)].adj[key]; if (xa && typeof xa.d === 'number') pb = Math.min(0.95, Math.max(0.05, pb + 0.04 * Math.max(-3, Math.min(2, xa.d)))); }   // דעת המנתח (data/expert/DATE.json): כל נקודה = 0.04 בסיכוי { const kp = key.split('|'), er = empRate(f, stat, kp[1], kp[2], parseFloat(kp[3]), f.home.id, f.away.id); if (er) { const w = Math.min(0.3, er.n / (er.n + 14)); pb = Math.min(0.95, Math.max(0.05, (1 - w) * pb + w * er.p)); } } 
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
     cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, note: sf.note, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
   const ahWhy = (name, opp, v, nm) => v > 0 ? `${name} מקבלת יתרון התחלתי של ${v} ${nm}, ולכן ההימור מפסיד רק אם ${opp} מנצחת בהפרש של יותר מ-${v} ${nm}.` : v < 0 ? `${name} צריכה לנצח בהפרש של יותר מ-${-v} ${nm} כדי שההימור יעבור.` : `${name} צריכה לנצח ב${nm} (תיקו = החזר).`;
