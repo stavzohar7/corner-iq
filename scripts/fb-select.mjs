@@ -17,9 +17,12 @@ const date = process.argv[2] || new Intl.DateTimeFormat('en-CA', { timeZone: 'As
 const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8'));
 const clean = x => String(x || '').replace(/[⁦-⁩]/g, '');
 const dir = path.join(ROOT, 'data', 'cache', 'siteodds');
-const files = fs.readdirSync(dir).filter(f => f.startsWith(`fb-${date}`) && f.endsWith('.json'));
-if (!files.length) { console.error('אין קבצי fb-' + date + '-*.json ב-data/cache/siteodds'); process.exit(1); }
-const games = files.flatMap(f => readJson(path.join(dir, f)));
+// כל קבצי fb-*.json (קובץ לליגה, יכול להכיל כמה ימים). לכל משחק יש date בפורמט DD.MM: לוקחים רק את התאריך המבוקש, ובכפילות (אותו gid בכמה קבצים) הקובץ החדש יותר מנצח
+const DDMM = date.slice(8, 10) + '.' + date.slice(5, 7);
+const files = fs.readdirSync(dir).filter(f => /^fb-\d{4}-\d{2}-\d{2}.*\.json$/.test(f)).sort((x, y) => fs.statSync(path.join(dir, x)).mtimeMs - fs.statSync(path.join(dir, y)).mtimeMs);
+const byGid = new Map(); for (const f of files) for (const g of readJson(path.join(dir, f))) if (!g.date || g.date === DDMM) byGid.set(g.gid || (g.h + g.a), g);
+const games = [...byGid.values()];
+if (!games.length) { console.error('אין משחקי ' + DDMM + ' בקבצי fb-*.json ב-data/cache/siteodds'); process.exit(1); }
 const day = readJson(path.join(ROOT, 'data', 'days', `${date}.json`));
 const teams = Object.fromEntries(Object.entries(readJson(path.join(ROOT, 'data', 'cache', 'matches.json')).teams).filter(([k]) => String(k).includes(':')));
 const resolve = buildResolver(teams);
@@ -27,7 +30,7 @@ const resolveAny = buildResolver(readJson(path.join(ROOT, 'data', 'cache', 'matc
 // כיול מהתוצאות האמיתיות שלנו (data/knowledge/calibration.json): לכל סוג הימור, כמה פעמים עבר מול כמה שהמודל צפה.
 // תיקון הסיכוי לפי ההפרש, מוקטן כשיש מעט דוגמאות. סוג שאין עליו היסטוריה מקבל הורדה קטנה ("לא הוכח").
 let CAL = {}; try { CAL = readJson(path.join(ROOT, 'data', 'knowledge', 'calibration.json')).sports.f.kinds || {}; } catch (e) {}
-const calFix = key => { const K = CAL[key.split('|').slice(0, 3).join('|')]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 15))); };
+const calFix = key => { const K = CAL[key.split('|').slice(0, 3).join('|')]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 8))); };
 
 // ---------- התפלגויות ----------
 const PHI = { g: 1.15, c: 1.45, c1: 1.4, sh: 1.5, sot: 1.4 };

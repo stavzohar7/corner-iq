@@ -57,8 +57,8 @@ window.__fbGame = async () => {
   return g;
 };
 // רץ ברקע על כל משחקי הרשימה (העמוד חייב להיות עמוד הליגה). מתקדם משחק אחרי משחק ושומר ב-localStorage.__FB
-window.__fbRun = async dd => {   // dd = 'DD.MM' (רק משחקי התאריך הזה), או בלי פרמטר לכל הרשימה
-  const list = window.__fbList(), idx = window.__rowSel().map((_, k) => k).filter(k => !dd || (list[k] && list[k].date === dd)), meta = {};
+window.__fbRun = async dd => {   // dd = 'DD.MM' או כמה תאריכים מופרדים בפסיק 'DD.MM,DD.MM,DD.MM' (כמה ימים קדימה), או בלי פרמטר לכל הרשימה
+  const list = window.__fbList(), idx = window.__rowSel().map((_, k) => k).filter(k => !dd || (list[k] && String(dd).split(',').includes(list[k].date))), meta = {};
   const listUrl = location.pathname + location.search, kk = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const listOk = () => { const l = window.__fbList(); return l.length === list.length && l[0] && list[0] && l[0].h === list[0].h; };
   const toList = async () => { history.back(); await sleep(3500); if (!listOk()) { history.pushState({}, '', listUrl); window.dispatchEvent(new PopStateEvent('popstate', { state: {} })); for (let w = 0; w < 12 && !listOk(); w++) await sleep(1000); } };   // חוזרים לרשימת הליגה (גם אם history.back הוביל לעמוד אחר)
@@ -88,3 +88,6 @@ window.__fbRun = async dd => {   // dd = 'DD.MM' (רק משחקי התאריך �
 window.__fbStatus = () => JSON.parse(localStorage.__FBS || '{}');
 // ייצוא קצר: בכל סולם משאירים את השורות סביב הקו המאוזן (פחות טקסט להעברה)
 window.__fbExport = () => { const F = JSON.parse(localStorage.__FB || '{}'); return JSON.stringify(Object.values(F).map(g => ({ gid: g.gid, url: g.url, h: g.h, a: g.a, date: g.date, time: g.time, main: g.main, c: g.c, c1: g.c1, cr: g.cr, sot: g.sot, sh: g.sh }))); };
+
+// שליחה לשרת הקליטה המקומי (node scripts/ingest-server.mjs רץ ברקע על פורט 8777): window.__ship('fb-YYYY-MM-DD-<ליגה>.json', window.__fbExport()). הדף עובר ל-localhost, אחר כך חוזרים עם navigate.
+window.__ship = (name, j) => { setTimeout(() => { location.href = 'http://127.0.0.1:8777/ingest#' + encodeURIComponent(name + '|' + btoa(j)); }, 200); return j.length; };
