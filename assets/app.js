@@ -393,7 +393,7 @@ function slipsHtml(s, sp, cat, want, extras) {
   const ex = id => (extras || []).find(e => e[0] === id);
   const keepTop = S => !cat || S.legs.some(l => catOfKey(l.key) === cat), keep = S => keepTop(S) && slipSt(S) === want;
   let cards = '', bet365 = false;
-  for (const [lv, name, cls] of SLIP_LV) { const X = slipAt(s, lv, sp); if (X.legs.length && keepTop(X)) { cards += slipCardHtml(s, X, '📋 ' + name, lv === 'strong' ? 'שלושת ההימורים הכי חזקים' : 'חזק, אבל פחות מהחזק', cls); if (X.legs.some(l => l.src !== 'fivebet')) bet365 = true; } }
+  for (const [lv, name, cls] of SLIP_LV) { const X = slipAt(s, lv, sp); if (X.legs.length && keepTop(X)) { cards += slipCardHtml(s, X, '📋 ' + name + (X.label ? ' · ' + X.label : ''), lv === 'strong' ? 'שלושת ההימורים הכי חזקים' : 'חזק, אבל פחות מהחזק', cls); if (X.legs.some(l => l.src !== 'fivebet')) bet365 = true; } }
   const wins = sp === 'f' ? (s.k.win || []).filter(w => w.legs.length && keep(w)) : [], fixedAll = sp === 'f' ? (s.k.lg || []).filter(w => w.legs.length && keep(w)) : [], fixed = fixedAll.filter(w => w.kind !== 'league'), leagueSl = fixedAll.filter(w => w.kind === 'league');
   const grid = list => '<div class="slipGrid">' + list + '</div>';
   const panes = [];   // [מזהה, כפתור, הסבר קצר, תוכן]

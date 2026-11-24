@@ -247,6 +247,8 @@ let strong = bandPick(mainPool);
 if (strong.length) { spec.strong.f = strong.map(toLeg); seen.add(sigOf(strong)); }
 const strongGames = new Set(strong.map(gid));
 let second = bandPick(mainPool, strongGames);
+// כלל: אותו הימור (משחק+סוג+קו) לא מופיע בשני טפסים באותו יום. אחרי החזק והשני, כל טופס אחר נבנה בלי ההימורים שכבר נבחרו
+const USED = new Set([...strong, ...second].map(legSig)), notUsed = c => !USED.has(legSig(c)), markUsed = L => L.forEach(c => USED.add(legSig(c)));
 if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second)); }
 // טפסי שעות: צברים של עד שעה וחצי בין תחילות המשחקים
 { const fx = [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].filter(f => f.ts * 1000 > Date.now() && !(uclDay && Number(f.lg) === UCL)).sort((a, b) => a.ts - b.ts);   // ביום אלופות: ליגת האלופות רק בטפסים הקבועים (19:45 / 22:00)
@@ -254,7 +256,7 @@ if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second));
   // כל משחק מופיע בטופס שעות אחד בלבד (בלי הימורים או משחקים שחוזרים בין טפסים)
   for (const st of [...starts, ...starts]) { const ids = new Set(fx.filter(f => f.ts >= st && f.ts - st <= 60 * 60).map(f => String(f.id)).filter(x => !usedG.has(x)));
     if (ids.size < 2) continue;
-    const L = bandPick(cands.filter(c => ids.has(gid(c)))); if (!L.length) continue;
+    const L = bandPick(cands.filter(c => ids.has(gid(c)) && notUsed(c))); if (!L.length) continue; markUsed(L);
     const gs = [...new Set(L.map(gid))]; gs.forEach(x => usedG.add(x)); seen.add(sigOf(L));
     const tm = gs.map(x => ilMin(tsOf.get(x))), a = Math.min(...tm), b = Math.max(...tm);
     spec.win.push({ label: (uclDay ? 'ליגות אחרות · ' : '') + (a === b ? 'משחקי ' + hhmm(a) : 'משחקי ' + hhmm(a) + '–' + hhmm(b)), legs: L.map(toLeg) }); } }
@@ -263,13 +265,14 @@ spec.win.sort((x, y) => x.label.localeCompare(y.label));
 // טפסים קבועים: בונדסליגה שבת 16:30, פרמייר ליג שבת 17:00
 for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' }, { lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' },
   { lg: 2, from: 19 * 60 + 15, to: 20 * 60 + 15, label: 'ליגת האלופות · משחקי 19:45' }, { lg: 2, from: 21 * 60 + 30, to: 22 * 60 + 30, label: 'ליגת האלופות · משחקי 22:00' }]) {
-  const poolR = cands.filter(c => Number(c.f.lg) === R.lg && (!R.dow || ilDow(c.f.ts) === R.dow) && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to); let L = bandPick(poolR); if (!L.length && poolR.length) { globalThis.__TRIPLE = true; L = bandPick(poolR); globalThis.__TRIPLE = false; } if (L.length && !seen.has(sigOf(L))) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
+  if (uclDay && R.lg === 2 && R.from >= 21 * 60) continue;   // ביום אלופות טפסי 22:00 הם החזק והשני (בלי טופס שלישי)
+  const poolR = cands.filter(c => notUsed(c) && Number(c.f.lg) === R.lg && (!R.dow || ilDow(c.f.ts) === R.dow) && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to); let L = bandPick(poolR); if (!L.length && poolR.length) { globalThis.__TRIPLE = true; L = bandPick(poolR); globalThis.__TRIPLE = false; } if (L.length && !seen.has(sigOf(L))) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); markUsed(L); } }
 // יום אלופות: שני טפסי 22:00 מסומנים בשם (אותם חזק ושני), כדי שיופיעו בטפסים הקבועים לצד טופס 19:45
-if (uclDay) { if (strong.length) spec.fixed.push({ label: 'ליגת האלופות · משחקי 22:00 · טופס 1', legs: strong.map(toLeg) }); if (second.length) spec.fixed.push({ label: 'ליגת האלופות · משחקי 22:00 · טופס 2', legs: second.map(toLeg) }); }
+if (uclDay) spec.labels = { strong: 'ליגת האלופות · משחקי 22:00', second: 'ליגת האלופות · משחקי 22:00' };   // החזק והשני ביום אלופות הם שני טפסי 22:00 (בלי העתק נוסף)
 // טופס חזק לכל ליגה (גם אם יש רק שלושה משחקים; בליגה עם פחות משלושה משחקים משלימים מהימור שני באותו משחק)
 for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
   if (uclDay && lg === UCL) continue;
-  const L = bandPick(cands.filter(c => Number(c.f.lg) === lg)); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L));
+  const L = bandPick(cands.filter(c => Number(c.f.lg) === lg && notUsed(c))); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L)); markUsed(L);
   const info = LEAGUES.find(l => l.id === lg); spec.fixed.push({ kind: 'league', label: (info ? info.he : 'ליגה ' + lg) + ' · כל משחקי היום', legs: L.map(toLeg) }); }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.stringify(spec, null, 1));
 // יחסי fivebet האמיתיים לכל הימור (לפי משחק ומפתח הימור): האתר מציג רק אותם, בלי יחס משוער

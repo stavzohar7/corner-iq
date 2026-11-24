@@ -34,7 +34,7 @@ const checkOdds = L => { const g = {}; for (const l of L) (g[l.id] = g[l.id] || 
 const mk = (legs, extra = {}) => { if (legs.length < 1 || legs.length > 6) throw new Error('טופס חייב 1 עד 6 הימורים'); const L = legs.map(full); checkOdds(L); return { legs: L, total: tot(L), res: null, src: 'fivebet', ...extra }; };
 // טפסים שאחד המשחקים שלהם כבר התחיל לא נדרסים (הרצה חוזרת מוסיפה/מרעננת רק את מה שעוד לא התחיל)
 const started = S => S && S.legs && S.legs.some(l => l.ts * 1000 < Date.now());
-for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) { if (started(day.k[lv][sp])) continue; day.k[lv][sp] = mk(legs); }
+for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) { if (started(day.k[lv][sp])) continue; day.k[lv][sp] = mk(legs, spec.labels && spec.labels[lv] ? { label: spec.labels[lv] } : {}); }
 const keepStarted = old => (old || []).filter(started);
 if (spec.win) { const keep = keepStarted(day.k.win), labels = new Set(keep.map(w => w.label)); day.k.win = [...keep, ...spec.win.filter(w => !labels.has(w.label)).map(w => ({ ...mk(w.legs), label: w.label }))].map((w, i) => ({ ...w, id: 'w' + (i + 1) })); }
 if (spec.fixed) { const keep = keepStarted(day.k.lg), labels = new Set(keep.map(w => w.label)); day.k.lg = [...keep, ...spec.fixed.filter(w => !labels.has(w.label)).map(w => ({ ...mk(w.legs), label: w.label, ...(w.kind ? { kind: w.kind } : {}) }))].map((w, i) => ({ ...w, id: 'F' + (i + 1) })); }   // טפסים קבועים וטופס לכל ליגה
