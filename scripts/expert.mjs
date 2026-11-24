@@ -37,7 +37,7 @@ function logLines(T, n = 8) {
 }
 
 import { stakesLines } from './stakes.mjs';
-export function writeDossier(file, { date, fixtures, leagueName, max = 14 }) {
+export function writeDossier(file, { date, fixtures, leagueName, max = 60 }) {
   const now = Date.now();
   const cand = fixtures.filter(f => f.enough && f.ts * 1000 > now - 5 * 60e3).sort((a, b) => (b.quality || 0) - (a.quality || 0)).slice(0, max).sort((a, b) => a.ts - b.ts);
   const out = [`# תיקי משחק ל-${date}`, '',
