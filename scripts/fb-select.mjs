@@ -242,6 +242,8 @@ spec.win.sort((x, y) => x.label.localeCompare(y.label));
 for (const R of [{ lg: 78, dow: 'Sat', from: 16 * 60 + 15, to: 16 * 60 + 45, label: 'בונדסליגה · שבת 16:30' }, { lg: 39, dow: 'Sat', from: 16 * 60 + 45, to: 17 * 60 + 15, label: 'פרמייר ליג · שבת 17:00' },
   { lg: 2, from: 19 * 60 + 15, to: 20 * 60 + 15, label: 'ליגת האלופות · משחקי 19:45' }, { lg: 2, from: 21 * 60 + 30, to: 22 * 60 + 30, label: 'ליגת האלופות · משחקי 22:00' }]) {
   const poolR = cands.filter(c => Number(c.f.lg) === R.lg && (!R.dow || ilDow(c.f.ts) === R.dow) && ilMin(c.f.ts) >= R.from && ilMin(c.f.ts) <= R.to); let L = bandPick(poolR); if (!L.length && poolR.length) { globalThis.__TRIPLE = true; L = bandPick(poolR); globalThis.__TRIPLE = false; } if (L.length && !seen.has(sigOf(L))) { spec.fixed.push({ label: R.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); } }
+// יום אלופות: שני טפסי 22:00 מסומנים בשם (אותם חזק ושני), כדי שיופיעו בטפסים הקבועים לצד טופס 19:45
+if (uclDay) { if (strong.length) spec.fixed.push({ label: 'ליגת האלופות · משחקי 22:00 · טופס 1', legs: strong.map(toLeg) }); if (second.length) spec.fixed.push({ label: 'ליגת האלופות · משחקי 22:00 · טופס 2', legs: second.map(toLeg) }); }
 // טופס חזק לכל ליגה (גם אם יש רק שלושה משחקים; בליגה עם פחות משלושה משחקים משלימים מהימור שני באותו משחק)
 for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
   if (uclDay && lg === UCL) continue;
