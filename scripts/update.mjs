@@ -55,6 +55,7 @@ async function main() {
   let dayFx = [], odds = new Map(), standings = new Map(), histRecords = [], ids365 = {}, meta = {};
   const c365file = path.join(DATA, 'cache', 's365.json');
   const c365 = loadC365(c365file);
+  for (const c of Object.keys(c365.formComps || {})) registerFormComp(Number(c));   // ליגות מקומיות שהתגלו (גם בריצת רענון)
   const seasonYear = (() => { const [y, m] = today.split('-').map(Number); return m >= 7 ? y : y - 1; })();
   if (REUSE) {
     const inp = readJson(inputsFile, null);

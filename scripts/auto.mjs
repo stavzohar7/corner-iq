@@ -19,9 +19,9 @@ process.on('exit', () => { try { fs.unlinkSync(LOCK); } catch { /* */ } });
 for (const sig of ['SIGINT', 'SIGTERM', 'SIGBREAK']) process.on(sig, () => { note('הופסקה על ידי ' + sig); process.exit(1); });
 note('התחלה');
 
-const today = ilDate(Date.now()), tomorrow = ilDate(Date.now() + 86400e3);
+const today = ilDate(Date.now()), DAYS_AHEAD = 4, ahead = Array.from({ length: DAYS_AHEAD }, (_, i) => ilDate(Date.now() + (DAYS_AHEAD - i) * 86400e3));   // ניתוח לכמה ימים קדימה (4 ימים), כדי שאפשר יהיה לבנות טפסים מראש
 let failed = 0;
-for (const date of [tomorrow, today]) {   // היום אחרון, כדי ש-last-run.json ישקף את היום
+for (const date of [...ahead, today]) {   // היום אחרון, כדי ש-last-run.json ישקף את היום
   const reuse = fs.existsSync(path.join(ROOT, 'data', 'cache', `inputs-${date}.json`));
   const env = { ...process.env, DATE: date }; if (reuse) env.REUSE_INPUTS = '1'; else delete env.REUSE_INPUTS;
   const r = spawnSync(process.execPath, ['scripts/update.mjs'], { cwd: ROOT, env, encoding: 'utf8', timeout: 12 * 60e3, windowsHide: true });
@@ -31,4 +31,4 @@ for (const date of [tomorrow, today]) {   // היום אחרון, כדי ש-last
 }
 try { const { runNotify } = await import('./notify.mjs'); await runNotify({ root: ROOT, today, log: note }); } catch (e) { note('התראות נכשלו: ' + e.message); }
 { const r = spawnSync(process.execPath, ['scripts/publish-git.mjs'], { cwd: ROOT, encoding: 'utf8', timeout: 3 * 60e3, windowsHide: true }); note('פרסום ל-GitHub: ' + ((r.stdout || '') + (r.stderr || '')).trim().split(String.fromCharCode(10)).pop()); }
-process.exit(failed === 2 ? 1 : 0);
+process.exit(failed === ahead.length + 1 ? 1 : 0);

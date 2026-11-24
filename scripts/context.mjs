@@ -13,7 +13,7 @@ const ALIAS = {
   'inter milan': 'inter', 'olympique de marseille': 'marseille', 'karlsruher': 'karlsruhe',
   'kasimpasa': 'kasimpasa', 'hamburger sv': 'hamburg', 'bayern munchen': 'bayern munich', 'sheffield utd': 'sheffield united', 'fortuna sittard': 'for sittard', 'fortuna s': 'for sittard', 'manchester utd': 'man united', 'sparta r': 'sparta rotterdam',
   'amed': 'amedspor', 'goztepe': 'goztep', 'basaksehir': 'buyuksehyr', 'istanbul basaksehir': 'buyuksehyr', 'oh leuven': 'oud heverlee leuven', 'athletic club': 'ath bilbao',
-  'paris saint germain': 'paris sg', 'paris saint germain fc': 'paris sg', 'psg': 'paris sg', 'slavia prague': 'slavia praha', 'sabah baku': 'sabah', 'inter m': 'inter milan', 'brugge': 'club brugge', 'viking fc': 'viking',
+  'paris saint germain': 'paris sg', 'paris saint germain fc': 'paris sg', 'psg': 'paris sg', 'borac banja luka': 'borac banjaluka', 'univ craiova': 'cs universitatea craiova', 'fc nordsjalland': 'fc nordsjælland', 'heart of midlothian': 'hearts', 'sint truidense': 'st truiden', 'sint truiden': 'st truiden', 'stvv': 'st truiden', 'sparta prague': 'sparta praha', 'slavia prague': 'slavia praha', 'sabah baku': 'sabah', 'inter m': 'inter milan', 'brugge': 'club brugge', 'viking fc': 'viking',
   'manchester city': 'man city', 'manchester united': 'man united', 'nottingham forest': 'nott m forest', 'wolverhampton wanderers': 'wolves',
   'brighton hove albion': 'brighton', 'sheffield wednesday': 'sheffield weds', 'west bromwich albion': 'west brom', 'queens park rangers': 'qpr',
   'atletico madrid': 'ath madrid', 'athletic club': 'ath bilbao', 'real sociedad': 'sociedad', 'celta vigo': 'celta', 'rayo vallecano': 'vallecano',
@@ -34,7 +34,7 @@ const ALIAS_N = Object.fromEntries(Object.entries(ALIAS).map(([k, v]) => [norm(k
 // בונה אינדקס מכל הקבוצות הידועות (מזהה → שם) ומאפשר לזהות שם מ-API אחר
 export function buildResolver(teamsById) {
   const entries = Object.entries(teamsById).map(([id, t]) => ({ id, n: norm(t.n), tok: new Set(norm(t.n).split(' ').filter(Boolean)) }));
-  const byNorm = new Map(entries.map(e => [e.n, e.id]));
+  const byNorm = new Map(); for (const e of entries) if (!byNorm.has(e.n)) byNorm.set(e.n, e.id);   // בהתנגשות שמות (CSKA Sofia / CSKA 1948 Sofia) הראשון מנצח
   const cache = new Map();
   return function resolve(name) {
     if (cache.has(name)) return cache.get(name);
