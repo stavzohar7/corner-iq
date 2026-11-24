@@ -23,6 +23,7 @@ const games = files.flatMap(f => readJson(path.join(dir, f)));
 const day = readJson(path.join(ROOT, 'data', 'days', `${date}.json`));
 const teams = Object.fromEntries(Object.entries(readJson(path.join(ROOT, 'data', 'cache', 'matches.json')).teams).filter(([k]) => String(k).includes(':')));
 const resolve = buildResolver(teams);
+const resolveAny = buildResolver(readJson(path.join(ROOT, 'data', 'cache', 'matches.json')).teams);   // גם קבוצות שמזהה שלהן מ-365 (בלי football-data), כדי שמשחק לא ידולג
 // כיול מהתוצאות האמיתיות שלנו (data/knowledge/calibration.json): לכל סוג הימור, כמה פעמים עבר מול כמה שהמודל צפה.
 // תיקון הסיכוי לפי ההפרש, מוקטן כשיש מעט דוגמאות. סוג שאין עליו היסטוריה מקבל הורדה קטנה ("לא הוכח").
 let CAL = {}; try { CAL = readJson(path.join(ROOT, 'data', 'knowledge', 'calibration.json')).sports.f.kinds || {}; } catch (e) {}
@@ -45,7 +46,7 @@ const bySig = new Map();
 for (const f of day.fixtures) bySig.set(String(f.home.id) + '|' + String(f.away.id), f);
 const unmatched = [], matched = [];
 for (const G of games) {
-  const xid = n => EXTRA_IDS[String(n).toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim()], hid = resolve(G.h) || xid(G.h), aid = resolve(G.a) || xid(G.a), f = bySig.get(String(hid) + '|' + String(aid));
+  const xid = n => EXTRA_IDS[String(n).toLowerCase().replace(/[^a-z ]/g, '').replace(/\s+/g, ' ').trim()] || resolveAny(n), hid = resolve(G.h) || xid(G.h), aid = resolve(G.a) || xid(G.a), f = bySig.get(String(hid) + '|' + String(aid));
   if (!f) { unmatched.push(`${G.h} - ${G.a}`); continue; }
   matched.push({ G, f });
 }

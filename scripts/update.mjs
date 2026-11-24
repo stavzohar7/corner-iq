@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LEAGUES, EURO, ISRAEL, TIMEZONE, LEAGUE_COEF } from './config.mjs';
-import { COMP, DOMESTIC, ISRAEL_COMPS, EURO_COMPS, NATIONS_COMPS, NATIONS_FIXTURE, stats365, dayGames, toBrief, isFinished, syncLists, fillStats, gameStats, gameLineups, lineupsToNews, loadCache as loadC365, saveCache as saveC365, pool } from './source-365.mjs';
+import { COMP, DOMESTIC, ISRAEL_COMPS, EURO_COMPS, FORM_COMPS, FORM_LGS, registerFormComp, isDomesticName, teamResults, NATIONS_COMPS, NATIONS_FIXTURE, stats365, dayGames, toBrief, isFinished, syncLists, fillStats, gameStats, gameLineups, lineupsToNews, loadCache as loadC365, saveCache as saveC365, pool } from './source-365.mjs';
 import { gatherFootballData, standingsFromRecords, FD_DIVS } from './source-fd.mjs';
 import { buildResolver, rivalryOf } from './context.mjs';
 import { applyExpert, writeDossier } from './expert.mjs';
@@ -108,6 +108,19 @@ async function main() {
       }
       // רשימות המשחקים של העונה + סטטיסטיקות (מלא ומחצית ראשונה), בתקציב קריאות לכל הרצה
       await syncLists(c365, DOMESTIC, seasonStartTs, log);
+      // קבוצות במשחקי אירופה שאין להן football-data: מושכים תוצאות אחרונות לפי קבוצה, כך שגם ליגות מקומיות שלא ברשימה (קפריסין, דנמרק...) יקבלו נתונים
+      for (const c of Object.keys(c365.formComps || {})) registerFormComp(Number(c));
+      {
+        const need = new Map(); for (const it of dayFx) if (EURO.includes(it.league.id)) for (const t of [it.teams.home, it.teams.away]) if (!resolveFD(t.name)) need.set(String(t.id), t.name);
+        let added = 0;
+        for (const [tid] of need) for (const b of await teamResults(tid)) {
+          if (!isFinished(b) || c365.games[b.id] || b.ts < seasonStartTs - 86400) continue;
+          if (!COMP[b.comp]) { if (!isDomesticName(b.cn)) continue; registerFormComp(b.comp); (c365.formComps ||= {})[b.comp] = b.cn; }
+          if (!(FORM_COMPS.includes(b.comp) || ISRAEL_COMPS.includes(b.comp) || EURO_COMPS.includes(b.comp) || DOMESTIC.includes(b.comp))) continue;
+          c365.games[b.id] = { ...b, full: undefined, h1: undefined }; added++;
+        }
+        if (need.size) log(`365: ${need.size} קבוצות בלי football-data, נוספו ${added} משחקים לפי תוצאות הקבוצה`);
+      }
       await syncLists(c365, NATIONS_COMPS, Date.UTC(seasonYear - 2, 6, 1) / 1000, log); // נבחרות: שנתיים אחורה, כידע מקדים
       for (const b of [...gYest, ...gToday]) if (COMP[b.comp] && isFinished(b) && !c365.games[b.id]) c365.games[b.id] = { ...b, full: undefined, h1: undefined };
       const fill = await fillStats(c365, Number(process.env.S365_MAX || 600), log);
@@ -119,7 +132,7 @@ async function main() {
       const sideObj = (f, i) => ({ c: f.c[i], sh: f.sh[i], sot: f.sot[i], f: f.f[i], k: f.k[i], pos: f.pos[i], xg: f.xg[i] });
       for (const g of Object.values(c365.games)) {
         const lgId = COMP[g.comp];
-        if (!(ISRAEL_COMPS.includes(g.comp) || EURO_COMPS.includes(g.comp) || NATIONS_COMPS.includes(g.comp)) || !g.full) continue;
+        if (!(ISRAEL_COMPS.includes(g.comp) || EURO_COMPS.includes(g.comp) || FORM_COMPS.includes(g.comp) || NATIONS_COMPS.includes(g.comp)) || !g.full) continue;
         cache.matches[g.id] = { id: g.id, ts: g.ts, lg: lgId, season: NATIONS_COMPS.includes(g.comp) ? seasonOfTs(g.ts) : seasonYear, h: g.h, a: g.a, g: g.g, ht: [null, null], ref: null, s: { h: sideObj(g.full, 0), a: sideObj(g.full, 1) }, h1: g.h1 ? { c: g.h1.c, sh: g.h1.sh, sot: g.h1.sot } : null };
         cache.teams[g.h] ||= { n: g.hn, l: null }; cache.teams[g.a] ||= { n: g.an, l: null };
       }
@@ -267,7 +280,7 @@ async function main() {
       const locate = (name, apiId) => {
         const fdId = resolve(name);
         if (fdId) return { id: fdId, lg: divLeague(fdId) };
-        for (const l of ISRAEL) { const m = getModel(l, sy); if (m.teams[apiId]) return { id: apiId, lg: l }; }
+        for (const l of [...ISRAEL, ...new Set(FORM_LGS)]) { const m = getModel(l, sy); if (m.teams[apiId]) return { id: apiId, lg: l }; }   // ישראל + ליגות מקומיות של קבוצות אירופה שאין להן football-data (נורווגיה, אוסטריה...)
         return null;
       };
       const th = locate(names.h, it.teams.home.id), ta = locate(names.a, it.teams.away.id);

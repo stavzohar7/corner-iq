@@ -8,10 +8,20 @@ const Q = 'appTypeId=5&langId=1&timezoneName=Asia/Jerusalem&userCountryId=6';
 const GAP_MS = Number(process.env.S365_GAP || 150);
 
 // מזהי תחרויות ב-365Scores → מזהה הליגה שלנו
-export const COMP = { 7: 39, 1: 40, 11: 140, 17: 135, 25: 78, 26: 79, 35: 61, 57: 88, 73: 94, 98: 144, 78: 203, 84: 197, 61: 179, 42: 383, 43: 382, 572: 2, 573: 3, 7685: 848, 7016: 5, 5421: 5, 5930: 5, 8: 45, 9: 48, 20: 137, 13: 143, 28: 81, 49: 384 };
-export const DOMESTIC = [7, 1, 11, 17, 25, 26, 35, 57, 73, 98, 78, 84, 61, 42, 43];
+export const COMP = { 7: 39, 1: 40, 11: 140, 17: 135, 25: 78, 26: 79, 35: 61, 57: 88, 73: 94, 98: 144, 78: 203, 84: 197, 61: 179, 42: 383, 43: 382, 572: 2, 573: 3, 7685: 848, 7016: 5, 5421: 5, 5930: 5, 8: 45, 9: 48, 20: 137, 13: 143, 28: 81, 49: 384, 131: 9131, 111: 9111, 145: 9145, 117: 9117, 5618: 9618, 129: 9129 };   // 9xxx: ליגות מקומיות של קבוצות שמשחקות באירופה (נורווגיה, אוסטריה, סלובקיה, צ'כיה, אזרבייג'ן, אוקראינה) - כדי שיהיו עליהן נתונים
+export const DOMESTIC = [7, 1, 11, 17, 25, 26, 35, 57, 73, 98, 78, 84, 61, 42, 43, 131, 111, 145, 117, 5618, 129];
 export const ISRAEL_COMPS = [42, 43];
 export const EURO_COMPS = [572, 573, 7685, 8, 9, 20, 13, 28, 49];
+export const FORM_COMPS = [131, 111, 145, 117, 5618, 129];
+export const FORM_LGS = FORM_COMPS.map(c => COMP[c]);
+// ליגות מקומיות שמתגלות אוטומטית דרך קבוצות שמשחקות באירופה (נשמרות במטמון c.formComps): כל ליגה מקבלת מזהה 9000+מזהה התחרות
+export function registerFormComp(comp) { if (!COMP[comp]) COMP[comp] = 9000 + comp; if (!FORM_COMPS.includes(comp)) { FORM_COMPS.push(comp); FORM_LGS.push(COMP[comp]); } }
+export const isDomesticName = n => !!n && !/friendl|super ?cup|qualif|shield|trophy|cup|champions league|europa|conference|nations|play-?off|playoff|relegation|final/i.test(n);
+// תוצאות אחרונות של קבוצה (כ-30 משחקים), גם מתחרויות שאין לנו ברשימה
+export async function teamResults(teamId) {
+  const j = await http(`${BASE}/games/results/?${Q}&competitors=${teamId}`);
+  return ((j && j.games) || []).map(brief);
+}   // ליגות מקומיות של קבוצות אירופה: משמשות רק כהיסטוריית משחקים לקבוצות, לא כמשחקי היום
 // נבחרות: ליגת האומות (7016) והמשחקים שמזינים את ההיכרות עם הנבחרות: מוקדמות המונדיאל של אופ״א (5421) והמונדיאל (5930)
 export const NATIONS_COMPS = [7016, 5421, 5930];
 export const NATIONS_FIXTURE = 7016;
@@ -43,7 +53,7 @@ export async function dayGames(dateIso) {
   const j = await http(`${BASE}/games/allscores/?${Q}&sports=1&startDate=${dmy(dateIso)}&endDate=${dmy(dateIso)}`);
   return (j && j.games) || [];
 }
-const brief = g => ({ id: g.id, comp: g.competitionId, ts: Math.floor(new Date(g.startTime).getTime() / 1000), h: g.homeCompetitor.id, a: g.awayCompetitor.id, hn: g.homeCompetitor.name, an: g.awayCompetitor.name, hl: g.homeCompetitor.imageVersion ? null : null, sg: g.statusGroup, g: [g.homeCompetitor.score, g.awayCompetitor.score], round: g.roundNum, season: g.seasonNum, grp: g.groupName || null, stage: g.stageNum });
+const brief = g => ({ id: g.id, comp: g.competitionId, ts: Math.floor(new Date(g.startTime).getTime() / 1000), h: g.homeCompetitor.id, a: g.awayCompetitor.id, hn: g.homeCompetitor.name, an: g.awayCompetitor.name, hl: g.homeCompetitor.imageVersion ? null : null, sg: g.statusGroup, g: [g.homeCompetitor.score, g.awayCompetitor.score], round: g.roundNum, season: g.seasonNum, cn: g.competitionDisplayName, grp: g.groupName || null, stage: g.stageNum });
 export const isFinished = g => g.sg === 4 && g.g && g.g[0] >= 0 && g.g[1] >= 0;
 export const isUpcoming = g => g.sg === 2;
 export const toBrief = brief;
