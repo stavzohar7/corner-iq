@@ -28,6 +28,7 @@ const ALIAS = {
   'galatasaray': 'galatasaray', 'fenerbahce': 'fenerbahce', 'besiktas': 'besiktas', 'celtic': 'celtic', 'rangers': 'rangers',
   'wolverhampton wandearers': 'wolves', 'swansea city': 'swansea', 'west bromwich': 'west brom', 'west ham utd': 'west ham', 'wolverhampton wanderers': 'wolves',
   'maccabi tel aviv': 'maccabi tel aviv', 'hapoel beer sheva': 'hapoel beer sheva', 'maccabi haifa': 'maccabi haifa',
+  'hapoel ironi k-sh': 'kiryat shmona', 'hapoel petach tikva': 'hapoel petah tikva',
 };
 
 const ALIAS_N = Object.fromEntries(Object.entries(ALIAS).map(([k, v]) => [norm(k), norm(v)]));
