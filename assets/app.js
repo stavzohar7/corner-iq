@@ -134,6 +134,12 @@ async function loadDay(date) {
         oldM.forEach((m, i) => { const o = O[[m.stat, m.group, m.side, m.line].join('|')]; if (o) { m.odds = o; m.src = 'fivebet'; m.estOdds = null; map[i] = keep.length; keep.push(m); } });
         f.markets = keep; f.picks = (f.picks || []).map(i => map[i]).filter(i => i != null);
         if (!f.picks.length) f.picks = keep.map((m, i) => [m, i]).filter(([m]) => m.score >= 6).sort((x, y) => y[0].score - x[0].score || (y[0].ev || 0) - (x[0].ev || 0)).slice(0, 2).map(([, i]) => i);
+        { // טקסטי הניתוח נכתבו לפני שנקראו הקווים של fivebet: מחליפים כל המלצה בהימורים שקיימים שם באמת (בלי קווים ויחסים משוערים)
+          const real = f.picks.map(i => keep[i]).filter(Boolean), lbl = real.map(m => m.label + ' (יחס ' + m.odds + ')'), fix = (arr, test, mk) => Array.isArray(arr) ? arr.map(x => typeof x === 'string' && test(x) ? mk() : x).filter(x => x) : arr;
+          f.story = fix(f.story, x => /^הזווית שהכי מתאימה/.test(x), () => real.length ? 'הזווית שהכי מתאימה למשחק הזה: ' + lbl[0] + '.' : null);
+          f.opinion = fix(f.opinion, x => /ההימור הכי נקי הוא|יחס משוער/.test(x), () => real.length ? 'אחרי שקלול ההיסטוריה, הסגנון של הקבוצות והחיסורים, ההימור הכי נקי הוא ' + lbl[0] + '.' + (lbl[1] ? ' אם רוצים עוד זווית: ' + lbl[1] + '.' : '') : null);
+          if (f.expert && Array.isArray(f.expert.take)) f.expert.take = fix(f.expert.take, x => /^להימור:/.test(x), () => real.length ? 'להימור: ' + lbl.join(' ו-') + ' (הקווים והיחסים מ-fivebet).' : null);
+        }
         if (Array.isArray(f.near)) f.near = [];
         idMap.set(f.id, map);
       }

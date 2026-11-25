@@ -251,7 +251,11 @@ if (strong.length) { spec.strong.f = strong.map(toLeg); seen.add(sigOf(strong));
 const strongGames = new Set(strong.map(gid));
 let second = bandPick(mainPool, strongGames);
 // כלל: אותו הימור (משחק+סוג+קו) לא מופיע בשני טפסים באותו יום. אחרי החזק והשני, כל טופס אחר נבנה בלי ההימורים שכבר נבחרו
-const USED = new Set([...strong, ...second].map(legSig)), notUsed = c => !USED.has(legSig(c)), markUsed = L => L.forEach(c => USED.add(legSig(c)));
+// אותו כיוון באותו משחק בשני טפסים נחשב כפילות (למשל "ברצלונה -3 קרנות" ו"סבאח מתחת ל-3.5 קרנות" = שניהם "ברצלונה שולטת בקרנות")
+const effTok = c => { const [st, p2, p3, p4] = c.key.split('|'), opp = s => s === 'home' ? 'away' : 'home', fam = st === 'c1' ? 'c' : st; if (!['c', 'sot', 'sh', 'g'].includes(fam)) return null; if (p2 === 'ah') { const ln = Number(p4); if (!(Math.abs(ln) >= 1)) return null; return gid(c) + '|' + fam + '|' + (ln < 0 ? p3 : opp(p3)); } if (fam === 'g' || !['home', 'away'].includes(p2)) return null; return gid(c) + '|' + fam + '|' + (p3 === 'over' ? p2 : opp(p2)); };
+const USED = new Set(), TOK = new Set(), markUsed = L => L.forEach(c => { USED.add(legSig(c)); const k = effTok(c); if (k) TOK.add(k); });
+const notUsed = c => { if (USED.has(legSig(c))) return false; const k = effTok(c); return !(k && TOK.has(k)); };
+markUsed([...strong, ...second]);
 if (second.length) { spec.second.f = second.map(toLeg); seen.add(sigOf(second)); }
 // טפסי שעות: צברים של עד שעה וחצי בין תחילות המשחקים
 { const fx = [...new Map(matched.map(m => [String(m.f.id), m.f])).values()].filter(f => f.ts * 1000 > Date.now() && !(cupDay && CUP_LG.has(Number(f.lg)))).sort((a, b) => a.ts - b.ts);   // ביום אלופות: ליגת האלופות רק בטפסים הקבועים (19:45 / 22:00)
