@@ -400,7 +400,8 @@ function slipsHtml(s, sp, cat, want, extras) {
   if (cards) panes.push(['top', '⭐ הכי חזקים', 'הטופס החזק והטופס השני של היום', grid(cards)]);
   else if (extras && extras.length) panes.push(['top', '⭐ הכי חזקים', '', '<div class="empty">' + (wantDone ? 'עוד אין טפסים חזקים שנגמרו.' : 'הטפסים החזקים של היום כבר התחילו או נגמרו. אפשר לראות אותם תחת "נגמרו".') + '</div>', '']);
   if (ex('rec')) panes.push(ex('rec'));
-  if (fixed.length) panes.push(['fixed', '📌 קבועים', 'טפסים קבועים של שבת: משחקי אותה שעה באותה ליגה', grid(fixed.map(w => slipCardHtml(s, w, '📌 ' + w.label, 'ההימורים הכי חזקים משם', 'slip2')).join(''))]);
+  const cupSl = sp === 'f' ? ['strong', 'second'].map(lv => slipAt(s, lv, 'f')).filter(X => X.legs.length && X.label && keep(X)) : [];
+  if (fixed.length || cupSl.length) panes.push(['fixed', '📌 קבועים', 'טפסי המפעלים האירופיים (ליגת האלופות, ליגה אירופית, קונפרנס) לפי שעה, וטפסי השבת: כל הטפסים של אותה שעה יחד', grid([...cupSl.map(X => slipCardHtml(s, X, '📌 ' + X.label, 'ההימורים הכי חזקים משם', 'slip2')), ...fixed.map(w => slipCardHtml(s, w, '📌 ' + w.label, 'ההימורים הכי חזקים משם', 'slip2'))].join('')), fixed.length + cupSl.length]);
   if (wins.length) panes.push(['win', '⏱ לפי שעות', 'משחקים שמתחילים בטווח של עד שעה וחצי זה מזה', grid(wins.map(w => slipCardHtml(s, w, '⏱ ' + w.label, 'ההימורים הכי חזקים בטווח הזה', 'slip2')).join(''))]);
   if (leagueSl.length) panes.push(['lg', '🏟 לפי ליגה', 'טופס חזק לכל ליגה, מכל שעות המשחקים שלה באותו יום', grid(leagueSl.map(w => slipCardHtml(s, w, '🏟 ' + w.label, 'ההימורים הכי חזקים בליגה', '')).join(''))]);
   if (ex('games')) panes.push(ex('games'));
