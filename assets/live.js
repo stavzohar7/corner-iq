@@ -73,4 +73,5 @@
     try { await fillToday(S.day.date); } catch (e) { return; }
     const ds = [...document.querySelectorAll('main details')]; open.forEach(i => { if (ds[i]) ds[i].open = true; }); window.scrollTo(0, y); };
   setInterval(tick, 40000); setTimeout(tick, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); }); window.addEventListener('focus', () => tick()); window.addEventListener('online', () => tick());
 })();
