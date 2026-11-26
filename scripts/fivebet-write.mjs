@@ -37,7 +37,7 @@ const started = S => S && S.legs && S.legs.some(l => l.ts * 1000 < Date.now());
 for (const lv of ['strong', 'second']) for (const [sp, legs] of Object.entries(spec[lv] || {})) { if (started(day.k[lv][sp])) continue; day.k[lv][sp] = mk(legs, spec.labels && spec.labels[lv] ? { label: spec.labels[lv] } : {}); }
 const keepStarted = old => (old || []).filter(started);
 if (spec.win) { const keep = keepStarted(day.k.win), labels = new Set(keep.map(w => w.label)); day.k.win = [...keep, ...spec.win.filter(w => !labels.has(w.label)).map(w => ({ ...mk(w.legs), label: w.label }))].map((w, i) => ({ ...w, id: 'w' + (i + 1) })); }
-if (spec.fixed) { const keep = keepStarted(day.k.lg), labels = new Set(keep.map(w => w.label)); day.k.lg = [...keep, ...spec.fixed.filter(w => !labels.has(w.label)).map(w => ({ ...mk(w.legs), label: w.label, ...(w.kind ? { kind: w.kind } : {}) }))].map((w, i) => ({ ...w, id: 'F' + (i + 1) })); }   // טפסים קבועים וטופס לכל ליגה
+if (spec.fixed) { const sps = new Set(spec.fixed.flatMap(w => w.legs.map(l => l.sport))), keep = (day.k.lg || []).filter(w => started(w) || !w.legs.every(l => sps.has(l.sport))), labels = new Set(keep.map(w => w.label)); day.k.lg = [...keep, ...spec.fixed.filter(w => !labels.has(w.label)).map(w => ({ ...mk(w.legs), label: w.label, ...(w.kind ? { kind: w.kind } : {}) }))].map((w, i) => ({ ...w, id: 'F' + (i + 1) })); }   // טפסים קבועים וטופס לכל ליגה
 slips.updated = new Date().toISOString();
 fs.writeFileSync(path.join(ROOT, 'data', 'slips.json'), JSON.stringify(slips));
 console.log('נכתב:', Object.entries(spec.strong || {}).map(([k, v]) => 'חזק ' + k + ' ' + tot(v.map(full))).join(' · '), Object.entries(spec.second || {}).map(([k, v]) => 'שני ' + k + ' ' + tot(v.map(full))).join(' · '));
