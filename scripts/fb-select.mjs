@@ -44,6 +44,8 @@ const fair2 = (a, b) => (1 / a) / (1 / a + 1 / b);
 const MARGIN = 1.07;
 // משקל המודל מול מחיר השוק בסיכוי הסופי. בדיקה על 181 הימורים שנגמרו: הסיכוי שהמודל טען (בממוצע 0.8) מול מה שעבר בפועל (0.65) הראה ביטחון יתר, והמחיר של fivebet חזה טוב יותר. לכן השוק מקבל את רוב המשקל.
 const PM_W = 0.35;
+// תיקון הצפי של המודל עצמו לפי כל השווקים שנגמרו (calibration.json): סוג שהמודל העריך ביתר מורידים, סוג שהעריך בחסר מעלים
+const pmFix = key => { const K = CAL[key.split('|').slice(0, 3).join('|')]; return K && K.n >= 8 ? Math.max(-0.2, Math.min(0.1, (K.hit - K.expected) * K.n / (K.n + 15))) : 0; };
 // מנצחת / מפסידה / החזר (קו שלם)
 const wl = (probFn, vals) => { let w = 0, l = 0; for (const [x, p] of vals) { const r = probFn(x); if (r > 0) w += p; else if (r < 0) l += p; } return w / Math.max(1e-9, w + l); };
 
@@ -88,7 +90,7 @@ for (const { G, f } of matched) {
   { const mw = f.character && f.character.mw, fp = mw ? Math.max(mw.h, mw.a) : 0;
     if (fp >= 0.75 && E.c && E.c.h != null) { const homeFav = mw.h >= mw.a, up = 1.5, dn = 1.1; E.c = { ...E.c, h: Math.max(0.5, E.c.h + (homeFav ? up : -dn)), a: Math.max(0.5, E.c.a + (homeFav ? -dn : up)) }; E.c.total = E.c.h + E.c.a; f.__dom = homeFav ? 'h' : 'a'; } } for (const st of ['g', 'c', 'c1', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
   const LGA = Object.fromEntries(["g", "c", "c1", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
-  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; let pb = Math.min(0.95, Math.max(0.05, PM_W * pm + (1 - PM_W) * ps + calFix(key) + sf.d)); pb = Math.min(ps + 0.1, Math.max(ps - 0.15, pb)); { const xa = EXPERT[String(f.id)] && EXPERT[String(f.id)].adj && EXPERT[String(f.id)].adj[key]; if (xa && typeof xa.d === 'number') pb = Math.min(0.95, Math.max(0.05, pb + 0.04 * Math.max(-3, Math.min(2, xa.d)))); }   // דעת המנתח (data/expert/DATE.json): כל נקודה = 0.04 בסיכוי
+  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; pm = Math.min(0.97, Math.max(0.03, pm + pmFix(key))); let pb = Math.min(0.95, Math.max(0.05, PM_W * pm + (1 - PM_W) * ps + calFix(key) + sf.d)); pb = Math.min(ps + 0.1, Math.max(ps - 0.15, pb)); { const xa = EXPERT[String(f.id)] && EXPERT[String(f.id)].adj && EXPERT[String(f.id)].adj[key]; if (xa && typeof xa.d === 'number') pb = Math.min(0.95, Math.max(0.05, pb + 0.04 * Math.max(-3, Math.min(2, xa.d)))); }   // דעת המנתח (data/expert/DATE.json): כל נקודה = 0.04 בסיכוי
     { const kp = key.split('|'), er = empRate(f, stat, kp[1], kp[2], parseFloat(kp[3]), f.home.id, f.away.id); if (er) { const w = Math.min(0.3, er.n / (er.n + 14)); pb = Math.min(0.95, Math.max(0.05, (1 - w) * pb + w * er.p)); } }   // למידת קבוצות: איך הקבוצה באמת התנהגה מול הקו המדויק
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
     cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, note: sf.note, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
@@ -239,7 +241,7 @@ function bandPick0(pool, avoidGames = new Set(), maxGames = 4, minG = 2) {
     const G = gameOptions(pool, min); if (G.length < minG) continue;
     let best = null;
     const rec = (i, pick, tot, n) => {
-      if (i === G.length) { if (n >= minG && tot >= BAND_MIN) { const sc = pick.reduce((s, o) => s + Math.log(o.pj), 0) - 0.01 * Math.max(0, n - 4); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
+      if (i === G.length) { if (n >= minG && tot >= (globalThis.__BMIN || BAND_MIN)) { const sc = pick.reduce((s, o) => s + Math.log(o.pj), 0) - 0.01 * Math.max(0, n - 4); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
       rec(i + 1, pick, tot, n);
       if (n < maxGames) for (const o of G[i].ch) { const fam = o.legs.map(riskFam).filter(Boolean), cnt = {}; for (const q of pick) for (const l of q.legs) { const r = riskFam(l); if (r) cnt[r] = (cnt[r] || 0) + 1; }
         if (fam.some(x => (cnt[x] || 0) + fam.filter(y => y === x).length > 1)) continue;   // לא יותר מהימור אחד מאותה משפחה מתואמת בטופס (למשל מעל קרנות)
@@ -302,6 +304,12 @@ for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
   if (cupDay && CUP_LG.has(lg)) continue;
   const L = bandPick(cands.filter(c => Number(c.f.lg) === lg && notUsed(c))); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L)); markUsed(L);
   const info = LEAGUES.find(l => l.id === lg); spec.fixed.push({ kind: 'league', label: (info ? info.he : 'ליגה ' + lg) + ' · כל משחקי היום', legs: L.map(toLeg) }); }
+// טפסי יחס גבוה (בלי תקרה ליחס): משחקים רבים יותר, כל הימור מהסוגים הטובים והסבירים ביותר שנשארו. הסיכוי שלהם נמוך מטבעו, ולכן רק שניים ביום
+for (const H of [{ min: 8, max: 5, label: 'יחס גבוה · כל משחקי היום' }, { min: 16, max: 7, label: 'יחס גבוה (2) · כל משחקי היום' }]) {
+  const pool = cands.filter(c => notUsed(c) && !(cupDay && CUP_LG.has(Number(c.f.lg))) && c.f.ts * 1000 > Date.now()); if (new Set(pool.map(gid)).size < 4) continue;
+  const avoid = new Set(spec.fixed.filter(x => /^יחס גבוה/.test(x.label)).flatMap(x => x.legs.map(l => String(l.id))));
+  globalThis.__BMIN = H.min; let L = []; try { L = bandPick(pool, avoid, H.max, 3); } finally { globalThis.__BMIN = 0; }
+  if (L.length && !seen.has(sigOf(L))) { spec.fixed.push({ label: H.label, legs: L.map(toLeg) }); seen.add(sigOf(L)); markUsed(L); } }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `fb-spec-${date}.json`), JSON.stringify(spec, null, 1));
 // יחסי fivebet האמיתיים לכל הימור (לפי משחק ומפתח הימור): האתר מציג רק אותם, בלי יחס משוער
 { const dir = path.join(ROOT, 'data', 'fbodds'), file = path.join(dir, date + '.json'); fs.mkdirSync(dir, { recursive: true });

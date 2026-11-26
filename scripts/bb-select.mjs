@@ -17,7 +17,7 @@ const site = readJson(path.join(ROOT, 'data', 'cache', 'siteodds', `bb-${date}.j
 const clean = x => String(x || '').replace(/[⁦-⁩]/g, '').trim();
 let CAL = {}; try { CAL = readJson(path.join(ROOT, 'data', 'knowledge', 'calibration.json')).sports.b.kinds || {}; } catch (e) {}
 const calKey = key => { const p = key.split('|'); return p[0] === 'pst' ? 'pst|' + p[2] : p[0] === 'ts' ? 'ts|' + p[1] : p.slice(0, 2).join('|'); };
-const calFix = key => { const K = CAL[calKey(key)]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 15))); };
+const calFix = key => { const K = CAL[calKey(key)]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.06, (K.hit - K.expected) * K.n / (K.n + 15))); };
 
 // התפלגות נורמלית
 const erf = x => { const t = 1 / (1 + 0.3275911 * Math.abs(x)), y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x); return x >= 0 ? y : -y; };
@@ -55,7 +55,7 @@ for (const G of site.games) {
   const add = (key, label, odds, pm, ps, kind, logic, block, dStyle, tier) => {
     if (!(odds >= 1.2) || pm == null || block) return;
     if (tier === 'prop') pm = 0.7 * pm + 0.3 * ps;   // שווקים חדשים שעוד לא נבדקו מול תוצאות: נותנים משקל גדול יותר ליחס של האתר
-    const pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + (dStyle || 0)));
+    const pbRaw = 0.35 * pm + 0.65 * ps + calFix(key) + (dStyle || 0), pb = Math.min(0.95, Math.max(0.05, Math.min(ps + 0.1, Math.max(ps - 0.15, pbRaw))));   // השוק מקבל את רוב המשקל והסיכוי לא עולה מעל המחיר ביותר מ-0.10 (בדיקה בכדורגל הראתה ביטחון יתר של המודל)
     cands.push({ game, key, label: `${label} (${name})`, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), gap: +Math.abs(pm - ps).toFixed(3), ev: +(pb * odds - 1).toFixed(3), kind, tier: tier || null, why: whyOf(g, tier === 'prop' ? 'prop' : key.split('|')[0], avLine, logic) });
   };
   // סך נקודות: רק "מתחת", ורק כשהקו גבוה מהצפי. נבדק מול הממוצע בפועל של שתי הקבוצות: הקו חייב להיות גבוה ממנו ב-4 נקודות לפחות
@@ -97,7 +97,7 @@ const pool = cands.filter(ok).sort((a, b) => b.rk - a.rk);
 if (process.env.BB_DEBUG) for (const c of cands.filter(c => c.tier === 'prop').sort((a, b) => b.pb - a.pb)) console.log((ok(c) ? 'OK ' : '-- ') + c.pb.toFixed(2) + ' @' + c.odds + ' (מודל ' + c.pm + ', אתר ' + c.ps + ') ' + c.label + ' [' + c.key + ']');
 const leg = (c, sp) => ({ sport: sp, id: c.game.id, key: c.key, label: c.label, odds: c.odds, score: (pb => pb >= 0.84 ? 10 : pb >= 0.78 ? 9 : pb >= 0.72 ? 8 : pb >= 0.64 ? 7 : 6)(c.pb), p: c.pb, ev: c.ev, why: c.why });
 const bySport = c => c.game.comp === 103 ? 'n' : 'e';
-const spec = { date, strong: {}, second: {} };
+const spec = { date, strong: {}, second: {}, fixed: [] };
 // טפסים חזקים: עד 3 משחקים. הימור שני באותו משחק רק אם הוא חזק (רף גבוה), מסוג שונה ולא סותר, ושני ההימורים יחד ביחס 1.8 לפחות.
 const PAIR_MIN = 0.62, kindOf = c => c.key.split('|')[0];
 // ב-fivebet אפשר לשלב ב-Bet Builder כל שני שווקים מאותו משחק. כאן: כל שני סוגים שונים, חוץ מכפילות (ניצחון+הנדיקאפ) וסתירה (סך נקודות מתחת עם קבוצה מעל, או להפך)
@@ -121,12 +121,12 @@ function pickBB(T, exclGames) {
 // יחס כולל לפחות 3 (יעד 4-5): מוסיפים משחקים חזקים נוספים עד שמגיעים, ואם עדיין לא מגיעים לא מציגים טופס
 const prodO = os => os.reduce((p, o) => p * o.legs.reduce((q, c) => q * c.odds, 1), 1);
 // בוחרים את צירוף המשחקים שממקסם את הסיכוי שהטופס כולו יעבור, בתנאי שהיחס הכולל לפחות 3 (לכל משחק: הימור בודד או שילוב)
-function bandBB(opts, min = 3) {
+function bandBB(opts, min = 3, minTot = 3, maxN = 5) {
   const top = opts.slice(0, 9); let best = null;
   const rec = (i, pick, tot, lp) => {
-    if (i === top.length) { if (pick.length >= Math.min(min, 2) && tot >= 3 && (!best || lp > best.lp)) best = { lp, pick: pick.slice() }; return; }
+    if (i === top.length) { if (pick.length >= Math.min(min, 2) && tot >= minTot && (!best || lp > best.lp)) best = { lp, pick: pick.slice() }; return; }
     rec(i + 1, pick, tot, lp);
-    if (pick.length < 5) { const o = top[i], variants = o.alt ? [o, o.alt] : [o]; for (const v of variants) { pick.push(v); rec(i + 1, pick, tot * v.legs.reduce((q, c) => q * c.odds, 1), lp + Math.log(v.pj)); pick.pop(); } }
+    if (pick.length < maxN) { const o = top[i], variants = o.alt ? [o, o.alt] : [o]; for (const v of variants) { pick.push(v); rec(i + 1, pick, tot * v.legs.reduce((q, c) => q * c.odds, 1), lp + Math.log(v.pj)); pick.pop(); } }
   };
   rec(0, [], 1, 0);
   if (!best) return [];
@@ -140,6 +140,12 @@ for (const sp of ['n', 'e']) {
     spec.strong[sp] = A.flatMap(o => o.legs).map(c => leg(c, sp));
     if (sp !== 'e') { const used = new Set(A.map(o => o.id)), B = bandBB(pickBB(T, used)); if (B.length >= 3) spec.second[sp] = B.flatMap(o => o.legs).map(c => leg(c, sp)); }
   }
+}
+// טפסי יחס גבוה (בלי תקרה): הימורים שלא נכנסו לטפסים הקודמים, משחקים רבים יותר. רק כשיש לפחות 4 משחקים
+for (const sp of ['n', 'e']) {
+  const mk2 = k => k.split('|').slice(0, 2).join('|'), used = new Set([...(spec.strong[sp] || []), ...(spec.second[sp] || [])].map(l => l.id + '|' + mk2(l.key)));   // אותו משחק ואותו כיוון (גם בקו אחר) לא חוזר בטופס נוסף
+  const T = pool.filter(c => bySport(c) === sp && !used.has(c.game.id + '|' + mk2(c.key))); if (new Set(T.map(c => c.game.id)).size < 4) continue;
+  const H = bandBB(pickBB(T, new Set()), 4, 8, 6); if (H.length >= 4) spec.fixed.push({ label: 'יחס גבוה · ' + (sp === 'n' ? 'NBA' : 'יורוליג'), legs: H.flatMap(o => o.legs).map(c => leg(c, sp)) });
 }
 fs.writeFileSync(path.join(ROOT, 'data', 'cache', `bb-spec-${date}.json`), JSON.stringify(spec, null, 1));
 console.log(`מועמדים: ${cands.length}, עוברים: ${pool.length}`);
