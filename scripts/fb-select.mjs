@@ -30,7 +30,10 @@ const resolveAny = buildResolver(readJson(path.join(ROOT, 'data', 'cache', 'matc
 // כיול מהתוצאות האמיתיות שלנו (data/knowledge/calibration.json): לכל סוג הימור, כמה פעמים עבר מול כמה שהמודל צפה.
 // תיקון הסיכוי לפי ההפרש, מוקטן כשיש מעט דוגמאות. סוג שאין עליו היסטוריה מקבל הורדה קטנה ("לא הוכח").
 let CAL = {}; try { CAL = readJson(path.join(ROOT, 'data', 'knowledge', 'calibration.json')).sports.f.kinds || {}; } catch (e) {}
-const calFix = key => { const K = CAL[key.split('|').slice(0, 3).join('|')]; if (!K || !K.n) return -0.03; return Math.max(-0.25, Math.min(0.12, (K.hit - K.expected) * K.n / (K.n + 8))); };
+// תיקון לפי מה שקרה בפועל להימורים שהמלצנו (data/betlog.json): לכל סוג, שיעור הצלחה בפועל פחות מה שהמחיר של fivebet רומז (0.95/יחס).
+// סוג שעבר יותר ממה שהמחיר רומז מקבל תוספת, סוג שנפל מקבל הורדה; מוקטן כשיש מעט דוגמאות. סוג בלי היסטוריה: הורדה קטנה ("לא הוכח").
+const REAL = (() => { const by = {}; try { for (const x of readJson(path.join(ROOT, 'data', 'betlog.json')).bets) { if (x.sp !== 'f' || (x.r !== 'w' && x.r !== 'l') || !(x.o > 1)) continue; const k = x.k.split('|').slice(0, 3).join('|'), v = by[k] || (by[k] = { n: 0, w: 0, imp: 0 }); v.n++; if (x.r === 'w') v.w++; v.imp += 0.95 / x.o; } } catch (e) {} return by; })();
+const calFix = key => { const K = REAL[key.split('|').slice(0, 3).join('|')]; if (!K || K.n < 3) return -0.03; return Math.max(-0.2, Math.min(0.08, (K.w - K.imp) / K.n * K.n / (K.n + 10))); };
 
 // ---------- התפלגויות ----------
 const PHI = { g: 1.15, c: 1.45, c1: 1.4, sh: 1.5, sot: 1.4 };
@@ -39,6 +42,8 @@ const nb = (m, phi, n = 70) => { const p = []; if (!(m > 0)) return [1]; if (phi
 const conv = (a, b) => { const o = Array(a.length + b.length - 1).fill(0); a.forEach((x, i) => b.forEach((y, j) => { o[i + j] += x * y; })); return o; };
 const fair2 = (a, b) => (1 / a) / (1 / a + 1 / b);
 const MARGIN = 1.07;
+// משקל המודל מול מחיר השוק בסיכוי הסופי. בדיקה על 181 הימורים שנגמרו: הסיכוי שהמודל טען (בממוצע 0.8) מול מה שעבר בפועל (0.65) הראה ביטחון יתר, והמחיר של fivebet חזה טוב יותר. לכן השוק מקבל את רוב המשקל.
+const PM_W = 0.35;
 // מנצחת / מפסידה / החזר (קו שלם)
 const wl = (probFn, vals) => { let w = 0, l = 0; for (const [x, p] of vals) { const r = probFn(x); if (r > 0) w += p; else if (r < 0) l += p; } return w / Math.max(1e-9, w + l); };
 
@@ -83,7 +88,8 @@ for (const { G, f } of matched) {
   { const mw = f.character && f.character.mw, fp = mw ? Math.max(mw.h, mw.a) : 0;
     if (fp >= 0.75 && E.c && E.c.h != null) { const homeFav = mw.h >= mw.a, up = 1.5, dn = 1.1; E.c = { ...E.c, h: Math.max(0.5, E.c.h + (homeFav ? up : -dn)), a: Math.max(0.5, E.c.a + (homeFav ? -dn : up)) }; E.c.total = E.c.h + E.c.a; f.__dom = homeFav ? 'h' : 'a'; } } for (const st of ['g', 'c', 'c1', 'sh', 'sot']) if (E[st] && E[st].h != null && E[st].a != null) { const h = nb(E[st].h, PHI[st]), a = nb(E[st].a, PHI[st]); dist[st] = { h, a, t: conv(h, a), e: E[st] }; }
   const LGA = Object.fromEntries(["g", "c", "c1", "sh", "sot"].map(k => [k, E[k] && E[k].lg])), PH = profile(f.home, true, LGA), PA = profile(f.away, false, LGA);
-  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; let pb = Math.min(0.95, Math.max(0.05, 0.5 * pm + 0.5 * ps + calFix(key) + sf.d)); { const xa = EXPERT[String(f.id)] && EXPERT[String(f.id)].adj && EXPERT[String(f.id)].adj[key]; if (xa && typeof xa.d === 'number') pb = Math.min(0.95, Math.max(0.05, pb + 0.04 * Math.max(-3, Math.min(2, xa.d)))); }   // דעת המנתח (data/expert/DATE.json): כל נקודה = 0.04 בסיכוי { const kp = key.split('|'), er = empRate(f, stat, kp[1], kp[2], parseFloat(kp[3]), f.home.id, f.away.id); if (er) { const w = Math.min(0.3, er.n / (er.n + 14)); pb = Math.min(0.95, Math.max(0.05, (1 - w) * pb + w * er.p)); } } 
+  const add = (stat, key, label, odds, pm, ps, cat, why) => { if (odds > 0) (fbAll[String(f.id)] = fbAll[String(f.id)] || {})[key] = odds; if (pm == null || !(odds >= 1.2 && odds <= 5)) return; const gap = Math.abs(pm - ps); if (gap > 0.2) return; const sf = styleFit(key, hn(f), an(f), PH, PA); if (sf.block) return; let pb = Math.min(0.95, Math.max(0.05, PM_W * pm + (1 - PM_W) * ps + calFix(key) + sf.d)); pb = Math.min(ps + 0.1, Math.max(ps - 0.15, pb)); { const xa = EXPERT[String(f.id)] && EXPERT[String(f.id)].adj && EXPERT[String(f.id)].adj[key]; if (xa && typeof xa.d === 'number') pb = Math.min(0.95, Math.max(0.05, pb + 0.04 * Math.max(-3, Math.min(2, xa.d)))); }   // דעת המנתח (data/expert/DATE.json): כל נקודה = 0.04 בסיכוי
+    { const kp = key.split('|'), er = empRate(f, stat, kp[1], kp[2], parseFloat(kp[3]), f.home.id, f.away.id); if (er) { const w = Math.min(0.3, er.n / (er.n + 14)); pb = Math.min(0.95, Math.max(0.05, (1 - w) * pb + w * er.p)); } }   // למידת קבוצות: איך הקבוצה באמת התנהגה מול הקו המדויק
     const adj = { 'sh-over': .03, 'sot-over': .02, 'sot-under': .02, 'dc-x2': .03, 'dc-12': .03, 'combo-not-lose-under': .03, 'combo-not-lose-over': .02, 'team-score': .02, 'g-over': .01, 'g-under': -.04, 'c-under': -.06, 'sh-under': -.05, 'hc-g': -.05, 'dc-1x': -.02 }[cat] || 0;
     cands.push({ f, G, stat, key, label, odds, pm: +pm.toFixed(3), ps: +ps.toFixed(3), pb: +pb.toFixed(3), rank: pb + adj, cat, why, note: sf.note, sd: sf.d, dist: stat === 'g' ? dist.g : null }); };
   const ahWhy = (name, opp, v, nm) => v > 0 ? `${name} מקבלת יתרון התחלתי של ${v} ${nm}, ולכן ההימור מפסיד רק אם ${opp} מנצחת בהפרש של יותר מ-${v} ${nm}.` : v < 0 ? `${name} צריכה לנצח בהפרש של יותר מ-${-v} ${nm} כדי שההימור יעבור.` : `${name} צריכה לנצח ב${nm} (תיקו = החזר).`;
@@ -150,7 +156,7 @@ function whyOf(c) {
   for (const p of parts) { const t = cl(p); if (!t || seen.has(t)) continue; seen.add(t); out.push(endDot(t)); }
   return out.slice(0, 4).join(' ');
 }
-const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: (pb => pb >= 0.84 ? 10 : pb >= 0.78 ? 9 : pb >= 0.72 ? 8 : pb >= 0.64 ? 7 : 6)(c.pb), fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: whyOf(c) });
+const toLeg = c => ({ sport: 'f', id: c.f.id, key: c.key, label: c.label, odds: c.odds, score: (pb => pb >= 0.8 ? 10 : pb >= 0.74 ? 9 : pb >= 0.69 ? 8 : pb >= 0.62 ? 7 : 6)(c.pb), fb: c.G.url, p: c.pb, ev: +(c.pb * c.odds - 1).toFixed(3), why: whyOf(c) });
 if (process.env.FB_DUMP) fs.writeFileSync(path.join(ROOT, 'data', 'cache', 'fb-cands-' + date + '.json'), JSON.stringify(cands.filter(c => c.pb >= 0.55).map(c => toLeg(c)), null, 1));
 if (process.env.FB_DEBUG) { const m = {}; for (const c of cands) { const k = c.f.home.name + '-' + c.f.away.name; (m[k] = m[k] || []).push(c); } for (const [k, L] of Object.entries(m)) if (new RegExp(process.env.FB_DEBUG === '1' ? 'XXXX' : process.env.FB_DEBUG).test(k)) console.log(k, L.length, 'pb>=.6:', L.filter(c => c.pb >= 0.6).length, L.filter(c => c.pb >= 0.55 && c.odds >= 1.2).sort((x, y) => y.pb - x.pb).slice(0, 14).map(c => c.label + '@' + c.odds + ' pb' + c.pb + ' ev' + (c.pb * c.odds - 1).toFixed(2)).join(' ; ')); }
 const total = L => Math.round(L.reduce((p, c) => p * c.odds, 1) * 100) / 100;
@@ -159,7 +165,7 @@ const spec = { date, strong: {}, second: {}, win: [], fixed: [] }, seen = new Se
 // טפסים חזקים: 3 משחקים. בכל משחק נבחר ההימור החזק ביותר, מכל סוג (תוצאה, שערים, קרנות, בעיטות, צירופים).
 // הימור שני באותו משחק נוסף רק אם הוא גם חזק (רף גבוה יותר), מסוג שונה (לא שני הימורי תוצאה, ולא שני הימורים על אותו מדד), לא סותר את הראשון, ושניהם יחד עדיין סבירים.
 // אם אין הימור שני חזק, המשחק נשאר עם הימור אחד, ובמשחק אחר אפשר שיהיו שניים.
-const PAIR_MIN = 0.62, PAIR_JOINT_MIN = 0.45;
+const PAIR_MIN = 0.6, PAIR_JOINT_MIN = 0.36;
 const grpOf = c => c.key.split('|')[1], resFam = c => ['dc', '1x2', 'combo'].includes(grpOf(c));
 const famKey = c => resFam(c) ? 'res' : c.stat + '|' + grpOf(c);
 const predOf = key => { const [st, grp, side, ln] = key.split('|'), L = parseFloat(ln);
@@ -201,8 +207,10 @@ function pickGames(pool, avoidGames = new Set(), nGames = 3) {
 }
 
 // טופס עם יחס כולל 3.5 לפחות (יעד 4-5): לכל משחק אפשרות של הימור בודד או זוג, ובוחרים את השילוב החזק ביותר שמגיע לטווח
-const EV_MIN = 0.04, sideOf = c => c.key.split('|')[2];
-const redundant = (x, y) => (x.stat === 'g' && y.stat === 'g' && (grpOf(x) === 'ah' || grpOf(y) === 'ah')) || x.stat === y.stat && x.stat !== 'g' && sideOf(x) === sideOf(y) || (x.stat === 'g' && y.stat === 'g' && famKey(x) === famKey(y)) || (x.stat === 'g' && grpOf(x) === 'total' && grpOf(y) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && grpOf(y) === 'total' && grpOf(x) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && ['home','away'].includes(grpOf(x)) && grpOf(y) === 'total' && sideOf(x) === sideOf(y));
+// אותו כיוון באותו משחק (למשל "מתחת ל-2.5 קרנות במחצית" ו"מתחת ל-4.5 קרנות" של אותה קבוצה) הוא הימור כמעט זהה: לא בשני הימורים של אותו משחק ולא בשני טפסים
+const effTok = c => { const [st, p2, p3, p4] = c.key.split('|'), opp = s => s === 'home' ? 'away' : 'home', fam = st === 'c1' ? 'c' : st; if (!['c', 'sot', 'sh', 'g'].includes(fam)) return null; if (p2 === 'ah') { const ln = Number(p4); if (!(Math.abs(ln) >= 1)) return null; return gid(c) + '|' + fam + '|' + (ln < 0 ? p3 : opp(p3)); } if (fam === 'g' || !['home', 'away'].includes(p2)) return null; return gid(c) + '|' + fam + '|' + (p3 === 'over' ? p2 : opp(p2)); };
+const EV_MIN = -0.06, sideOf = c => c.key.split('|')[2];
+const redundant = (x, y) => (!globalThis.__LOOSE && effTok(x) && effTok(x) === effTok(y)) || (x.stat === 'g' && y.stat === 'g' && (grpOf(x) === 'ah' || grpOf(y) === 'ah')) || x.stat === y.stat && x.stat !== 'g' && sideOf(x) === sideOf(y) || (x.stat === 'g' && y.stat === 'g' && famKey(x) === famKey(y)) || (x.stat === 'g' && grpOf(x) === 'total' && grpOf(y) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && grpOf(y) === 'total' && grpOf(x) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && ['home','away'].includes(grpOf(x)) && grpOf(y) === 'total' && sideOf(x) === sideOf(y));
 const BAND_MIN = 3.5, BAND_MAX = 5.3, BAND_MID = 4.4;
 function gameOptions(pool, min) {
   const byGame = new Map();
@@ -223,7 +231,9 @@ function gameOptions(pool, min) {
   return res.sort((a, b) => b.best - a.best).slice(0, 8);
 }
 const riskFam = c => { const p = c.key.split('|'); if (p[2] === 'over' || (p[0] === 'sh' || p[0] === 'sot') && p[2] === 'over') return p[0] + '-over'; if (p[2] === 'under') return p[0] + '-under'; return null; };
-function bandPick(pool, avoidGames = new Set(), maxGames = 4, minG = 2) {
+// קודם בלי שני הימורים בכיוון זהה באותו משחק; רק אם אי אפשר להגיע ליחס 3.5 (למשל שני משחקים בלבד), מתירים אותם
+function bandPick(...a) { let L = bandPick0(...a); if (!L.length) { globalThis.__LOOSE = true; try { L = bandPick0(...a); if (!L.length) { globalThis.__TRIPLE = true; L = bandPick0(...a); } } finally { globalThis.__LOOSE = false; globalThis.__TRIPLE = false; } } return L; }
+function bandPick0(pool, avoidGames = new Set(), maxGames = 4, minG = 2) {
   pool = pool.filter(c => !avoidGames.has(gid(c)));
   for (const min of [0.6, 0.57, 0.54, 0.5]) {
     const G = gameOptions(pool, min); if (G.length < minG) continue;
@@ -253,7 +263,6 @@ const strongGames = new Set(strong.map(gid));
 let second = bandPick(mainPool, strongGames);
 // כלל: אותו הימור (משחק+סוג+קו) לא מופיע בשני טפסים באותו יום. אחרי החזק והשני, כל טופס אחר נבנה בלי ההימורים שכבר נבחרו
 // אותו כיוון באותו משחק בשני טפסים נחשב כפילות (למשל "ברצלונה -3 קרנות" ו"סבאח מתחת ל-3.5 קרנות" = שניהם "ברצלונה שולטת בקרנות")
-const effTok = c => { const [st, p2, p3, p4] = c.key.split('|'), opp = s => s === 'home' ? 'away' : 'home', fam = st === 'c1' ? 'c' : st; if (!['c', 'sot', 'sh', 'g'].includes(fam)) return null; if (p2 === 'ah') { const ln = Number(p4); if (!(Math.abs(ln) >= 1)) return null; return gid(c) + '|' + fam + '|' + (ln < 0 ? p3 : opp(p3)); } if (fam === 'g' || !['home', 'away'].includes(p2)) return null; return gid(c) + '|' + fam + '|' + (p3 === 'over' ? p2 : opp(p2)); };
 const USED = new Set(), TOK = new Set(), markUsed = L => L.forEach(c => { USED.add(legSig(c)); const k = effTok(c); if (k) TOK.add(k); });
 const notUsed = c => { if (USED.has(legSig(c))) return false; const k = effTok(c); return !(k && TOK.has(k)); };
 markUsed([...strong, ...second]);
