@@ -206,12 +206,12 @@ function pickGames(pool, avoidGames = new Set(), nGames = 3) {
   return [];
 }
 
-// טופס עם יחס כולל 3.5 לפחות (יעד 4-5): לכל משחק אפשרות של הימור בודד או זוג, ובוחרים את השילוב החזק ביותר שמגיע לטווח
+// טופס עם יחס כולל 3 לפחות (יעד 4-5): לכל משחק אפשרות של הימור בודד או זוג, ובוחרים את השילוב החזק ביותר שמגיע לטווח
 // אותו כיוון באותו משחק (למשל "מתחת ל-2.5 קרנות במחצית" ו"מתחת ל-4.5 קרנות" של אותה קבוצה) הוא הימור כמעט זהה: לא בשני הימורים של אותו משחק ולא בשני טפסים
 const effTok = c => { const [st, p2, p3, p4] = c.key.split('|'), opp = s => s === 'home' ? 'away' : 'home', fam = st === 'c1' ? 'c' : st; if (!['c', 'sot', 'sh', 'g'].includes(fam)) return null; if (p2 === 'ah') { const ln = Number(p4); if (!(Math.abs(ln) >= 1)) return null; return gid(c) + '|' + fam + '|' + (ln < 0 ? p3 : opp(p3)); } if (fam === 'g' || !['home', 'away'].includes(p2)) return null; return gid(c) + '|' + fam + '|' + (p3 === 'over' ? p2 : opp(p2)); };
 const EV_MIN = -0.06, sideOf = c => c.key.split('|')[2];
 const redundant = (x, y) => (!globalThis.__LOOSE && effTok(x) && effTok(x) === effTok(y)) || (x.stat === 'g' && y.stat === 'g' && (grpOf(x) === 'ah' || grpOf(y) === 'ah')) || x.stat === y.stat && x.stat !== 'g' && sideOf(x) === sideOf(y) || (x.stat === 'g' && y.stat === 'g' && famKey(x) === famKey(y)) || (x.stat === 'g' && grpOf(x) === 'total' && grpOf(y) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && grpOf(y) === 'total' && grpOf(x) === 'home' && sideOf(x) === sideOf(y)) || (x.stat === 'g' && ['home','away'].includes(grpOf(x)) && grpOf(y) === 'total' && sideOf(x) === sideOf(y));
-const BAND_MIN = 3.5, BAND_MAX = 5.3, BAND_MID = 4.4;
+const BAND_MIN = 3, BAND_MAX = 5.3, BAND_MID = 4.4;
 function gameOptions(pool, min) {
   const byGame = new Map();
   for (const c of pool.filter(c => c.pb >= min && c.pb * c.odds - 1 >= EV_MIN)) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
@@ -231,7 +231,7 @@ function gameOptions(pool, min) {
   return res.sort((a, b) => b.best - a.best).slice(0, 8);
 }
 const riskFam = c => { const p = c.key.split('|'); if (p[2] === 'over' || (p[0] === 'sh' || p[0] === 'sot') && p[2] === 'over') return p[0] + '-over'; if (p[2] === 'under') return p[0] + '-under'; return null; };
-// קודם בלי שני הימורים בכיוון זהה באותו משחק; רק אם אי אפשר להגיע ליחס 3.5 (למשל שני משחקים בלבד), מתירים אותם
+// קודם בלי שני הימורים בכיוון זהה באותו משחק; רק אם אי אפשר להגיע ליחס 3 (למשל שני משחקים בלבד), מתירים אותם
 function bandPick(...a) { let L = bandPick0(...a); if (!L.length) { globalThis.__LOOSE = true; try { L = bandPick0(...a); if (!L.length) { globalThis.__TRIPLE = true; L = bandPick0(...a); } } finally { globalThis.__LOOSE = false; globalThis.__TRIPLE = false; } } return L; }
 function bandPick0(pool, avoidGames = new Set(), maxGames = 4, minG = 2) {
   pool = pool.filter(c => !avoidGames.has(gid(c)));

@@ -118,13 +118,13 @@ function pickBB(T, exclGames) {
   }
   return opts.sort((x, y) => y.sc - x.sc);
 }
-// יחס כולל לפחות 3.5 (יעד 4-5): מוסיפים משחקים חזקים נוספים עד שמגיעים, ואם עדיין לא מגיעים לא מציגים טופס
+// יחס כולל לפחות 3 (יעד 4-5): מוסיפים משחקים חזקים נוספים עד שמגיעים, ואם עדיין לא מגיעים לא מציגים טופס
 const prodO = os => os.reduce((p, o) => p * o.legs.reduce((q, c) => q * c.odds, 1), 1);
-// בוחרים את צירוף המשחקים שממקסם את הסיכוי שהטופס כולו יעבור, בתנאי שהיחס הכולל לפחות 3.5 (לכל משחק: הימור בודד או שילוב)
+// בוחרים את צירוף המשחקים שממקסם את הסיכוי שהטופס כולו יעבור, בתנאי שהיחס הכולל לפחות 3 (לכל משחק: הימור בודד או שילוב)
 function bandBB(opts, min = 3) {
   const top = opts.slice(0, 9); let best = null;
   const rec = (i, pick, tot, lp) => {
-    if (i === top.length) { if (pick.length >= Math.min(min, 2) && tot >= 3.5 && (!best || lp > best.lp)) best = { lp, pick: pick.slice() }; return; }
+    if (i === top.length) { if (pick.length >= Math.min(min, 2) && tot >= 3 && (!best || lp > best.lp)) best = { lp, pick: pick.slice() }; return; }
     rec(i + 1, pick, tot, lp);
     if (pick.length < 5) { const o = top[i], variants = o.alt ? [o, o.alt] : [o]; for (const v of variants) { pick.push(v); rec(i + 1, pick, tot * v.legs.reduce((q, c) => q * c.odds, 1), lp + Math.log(v.pj)); pick.pop(); } }
   };
