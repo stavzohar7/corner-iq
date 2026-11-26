@@ -400,7 +400,7 @@ function slipsHtml(s, sp, cat, want, extras) {
   const keepTop = S => !cat || S.legs.some(l => catOfKey(l.key) === cat), keep = S => keepTop(S) && slipSt(S) === want;
   let cards = '', bet365 = false;
   for (const [lv, name, cls] of SLIP_LV) { const X = slipAt(s, lv, sp); if (X.legs.length && keepTop(X)) { cards += slipCardHtml(s, X, '📋 ' + name + (X.label ? ' · ' + X.label : ''), lv === 'strong' ? 'שלושת ההימורים הכי חזקים' : 'חזק, אבל פחות מהחזק', cls); if (X.legs.some(l => l.src !== 'fivebet')) bet365 = true; } }
-  const wins = sp === 'f' ? (s.k.win || []).filter(w => w.legs.length && keep(w)) : [], fixedAll = sp === 'f' ? (s.k.lg || []).filter(w => w.legs.length && keep(w)) : [], fixed = fixedAll.filter(w => w.kind !== 'league'), leagueSl = fixedAll.filter(w => w.kind === 'league');
+  const wins = sp === 'f' ? (s.k.win || []).filter(w => w.legs.length && keep(w)) : [], fixedAll = (s.k.lg || []).filter(w => w.legs.length && w.legs.every(l => l.sport === sp) && keep(w)), fixed = fixedAll.filter(w => w.kind !== 'league'), leagueSl = fixedAll.filter(w => w.kind === 'league');
   const grid = list => '<div class="slipGrid">' + list + '</div>';
   const panes = [];   // [מזהה, כפתור, הסבר קצר, תוכן]
   if (cards) panes.push(['top', '⭐ הכי חזקים', 'הטופס החזק והטופס השני של היום', grid(cards)]);
@@ -439,7 +439,7 @@ async function fillToday(date) {
   const bP = bday ? (bday.dayPicks || []).map(p => { const g = bday.fixtures.find(x => x.id === p.fid); return g && g.markets[p.mi] ? { g, m: g.markets[p.mi] } : null; }).filter(Boolean) : [];
   const ge = x => !x.m || !(x.m.odds > 0) || x.m.odds >= 1.4;
   const singles = { f: fP.filter(ge), n: bP.filter(x => x.g.comp === 103), e: bP.filter(x => x.g.comp !== 103) };
-  const hasSlip = sp => !!(s && s.k) && (SLIP_LV.some(([lv]) => slipAt(s, lv, sp).legs.length) || (sp === 'f' && ((s.k.win || []).some(w => w.legs.length) || (s.k.lg || []).some(w => w.legs.length))));
+  const hasSlip = sp => !!(s && s.k) && (SLIP_LV.some(([lv]) => slipAt(s, lv, sp).legs.length) || ((sp === 'f' && (s.k.win || []).some(w => w.legs.length)) || (s.k.lg || []).some(w => w.legs.length && w.legs.every(l => l.sport === sp))));
   const sports = SLIP_SP.filter(([sp]) => hasSlip(sp) || singles[sp].length);
   if (!sports.length) { box.innerHTML = '<div class="empty">אין עדיין טפסים או המלצות ליום הזה. הם נבנים בבוקר, ברגע שהיחסים מתפרסמים.</div>'; return; }
   if (!sports.some(x => x[0] === state.slipSp)) state.slipSp = sports[0][0];
