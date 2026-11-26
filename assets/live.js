@@ -66,6 +66,11 @@
   window.liveSlipLine = S => { if (!S || !S.legs || S.res) return ''; let live = 0, ok = 0, bad = 0; for (const l of S.legs) { if (l.sport !== 'f' || l.res) continue; const f = typeof findFx === 'function' ? findFx(l.id) : null; const e = f && L.map.get(String(f.id)); if (!e) continue; live++; const st = status(l.key, e).state; if (st === 'won' || st === 'on') ok++; else if (st === 'lost') bad++; }
     if (!live) return ''; return '<div class="liveSlip' + (bad ? ' bad' : '') + '"><span class="ldot"></span> בלייב: ' + (bad ? bad + ' הימורים נפלו בטופס' : ok + ' מתוך ' + live + ' הימורים נתפסים כרגע') + '</div>'; };
   window.liveCount = () => { const d = ST() && ST().day; return d && d.fixtures ? d.fixtures.filter(L.isLive).length : 0; };
-  const tick = async () => { if (document.hidden) return; const ch = await L.refresh(); if (ch && ST() && ST().tab === 'today' && ST().tstat === 'now' && typeof fillToday === 'function') fillToday(ST().day.date); };
+  // מרעננים את הלייב בכל מצב סינון (לא רק "בלייב"), ושומרים מיקום גלילה ופירוטים פתוחים, כדי שהסימון בטפסים יתעדכן לבד
+  const tick = async () => { if (document.hidden) return; const ch = await L.refresh(); const S = ST(); if (!ch || !S || S.tab !== 'today' || typeof fillToday !== 'function') return;
+    const ae = document.activeElement; if (ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
+    const y = window.scrollY, open = [...document.querySelectorAll('main details')].map((d, i) => d.open ? i : -1).filter(i => i >= 0);
+    try { await fillToday(S.day.date); } catch (e) { return; }
+    const ds = [...document.querySelectorAll('main details')]; open.forEach(i => { if (ds[i]) ds[i].open = true; }); window.scrollTo(0, y); };
   setInterval(tick, 40000); setTimeout(tick, 5000);
 })();
