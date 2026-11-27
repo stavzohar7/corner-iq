@@ -51,7 +51,9 @@ const wl = (probFn, vals) => { let w = 0, l = 0; for (const [x, p] of vals) { co
 
 // ---------- התאמת משחקי fivebet לשלנו ----------
 // קבוצות שאין להן מזהה football-data (בעיקר קבוצות קטנות באירופה): שם ב-fivebet באנגלית -> מזהה הקבוצה אצלנו. להוסיף כשיש "לא הותאמו"
-const EXTRA_IDS = { 'bodo glimt': 1978, 'lask linz': 1743, 'slovan bratislava': 2112 };
+const EXTRA_IDS = { 'bodo glimt': 1978, 'lask linz': 1743, 'slovan bratislava': 2112,
+  // הליגה הלאומית (ישראל) וליגת העל
+  'hapoel acre': 581, 'maccabi herzliya': 568, 'maccabi ahinazareth': 577, 'sc kiryat yam': 71360, 'maccabi bnei raina': 45617, 'maccabi kiryat gat': 7954, 'maccabi kabilio jaffa': 671, 'kfar kasem': 7959 };
 const bySig = new Map();
 for (const f of day.fixtures) bySig.set(String(f.home.id) + '|' + String(f.away.id), f);
 const unmatched = [], matched = [];
@@ -216,7 +218,7 @@ const redundant = (x, y) => (!globalThis.__LOOSE && effTok(x) && effTok(x) === e
 const BAND_MIN = 3, BAND_MAX = 5.3, BAND_MID = 4.4;
 function gameOptions(pool, min) {
   const byGame = new Map();
-  for (const c of pool.filter(c => c.pb >= min && c.pb * c.odds - 1 >= EV_MIN)) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
+  for (const c of pool.filter(c => c.pb >= min && c.pb * c.odds - 1 >= (globalThis.__EVLOW ? -0.2 : EV_MIN))) (byGame.get(gid(c)) || byGame.set(gid(c), []).get(gid(c))).push(c);
   const res = [];
   for (const L of byGame.values()) {
     L.sort((x, y) => y.rank - x.rank);
@@ -234,14 +236,14 @@ function gameOptions(pool, min) {
 }
 const riskFam = c => { const p = c.key.split('|'); if (p[2] === 'over' || (p[0] === 'sh' || p[0] === 'sot') && p[2] === 'over') return p[0] + '-over'; if (p[2] === 'under') return p[0] + '-under'; return null; };
 // קודם בלי שני הימורים בכיוון זהה באותו משחק; רק אם אי אפשר להגיע ליחס 3 (למשל שני משחקים בלבד), מתירים אותם
-function bandPick(...a) { let L = bandPick0(...a); if (!L.length) { globalThis.__LOOSE = true; try { L = bandPick0(...a); if (!L.length) { globalThis.__TRIPLE = true; L = bandPick0(...a); } } finally { globalThis.__LOOSE = false; globalThis.__TRIPLE = false; } } return L; }
+function bandPick(...a) { let L = bandPick0(...a); if (!L.length) { globalThis.__LOOSE = true; try { L = bandPick0(...a); if (!L.length) { globalThis.__TRIPLE = true; L = bandPick0(...a); } if (!L.length) { globalThis.__EVLOW = true; L = bandPick0(...a); } } finally { globalThis.__LOOSE = false; globalThis.__TRIPLE = false; globalThis.__EVLOW = false; } } return L; }
 function bandPick0(pool, avoidGames = new Set(), maxGames = 4, minG = 2) {
   pool = pool.filter(c => !avoidGames.has(gid(c)));
   for (const min of [0.6, 0.57, 0.54, 0.5]) {
     const G = gameOptions(pool, min); if (G.length < minG) continue;
     let best = null;
     const rec = (i, pick, tot, n) => {
-      if (i === G.length) { if (n >= minG && tot >= (globalThis.__BMIN || BAND_MIN)) { const sc = pick.reduce((s, o) => s + Math.log(o.pj), 0) - 0.01 * Math.max(0, n - 4); if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
+      if (i === G.length) { if (n >= minG && tot >= (globalThis.__BMIN || BAND_MIN)) { const sc = pick.reduce((s, o) => s + Math.log(o.pj), 0) - 0.01 * Math.max(0, n - 4) + (globalThis.__COVER || 0) * n; if (!best || sc > best.sc) best = { sc, pick: pick.slice(), tot }; } return; }
       rec(i + 1, pick, tot, n);
       if (n < maxGames) for (const o of G[i].ch) { const fam = o.legs.map(riskFam).filter(Boolean), cnt = {}; for (const q of pick) for (const l of q.legs) { const r = riskFam(l); if (r) cnt[r] = (cnt[r] || 0) + 1; }
         if (fam.some(x => (cnt[x] || 0) + fam.filter(y => y === x).length > 1)) continue;   // לא יותר מהימור אחד מאותה משפחה מתואמת בטופס (למשל מעל קרנות)
@@ -300,10 +302,14 @@ for (const C of activeCups) for (const S of SLOTS) {
     spec.fixed.push({ label: C.he + ' · משחקי ' + S.label + (n > 0 ? ' (' + (n + 1) + ')' : ''), legs: L.map(toLeg) }); seen.add(sigOf(L)); markUsed(L); L.forEach(c => slotGames.add(gid(c))); }
 }
 // טופס חזק לכל ליגה (גם אם יש רק שלושה משחקים; בליגה עם פחות משלושה משחקים משלימים מהימור שני באותו משחק)
-for (const lg of [...new Set(matched.map(m => Number(m.f.lg)))]) {
+// ליגת העל והליגה הלאומית של ישראל באותו טופס ליגה (שתיהן ביחד, כי לכל אחת יש רק כמה משחקים באותה שעה)
+const lgGroup = lg => lg === 383 ? 382 : lg;
+for (const lg of [...new Set(matched.map(m => lgGroup(Number(m.f.lg))))]) {
   if (cupDay && CUP_LG.has(lg)) continue;
-  const L = bandPick(cands.filter(c => Number(c.f.lg) === lg && notUsed(c))); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L)); markUsed(L);
-  const info = LEAGUES.find(l => l.id === lg); spec.fixed.push({ kind: 'league', label: (info ? info.he : 'ליגה ' + lg) + ' · כל משחקי היום', legs: L.map(toLeg) }); }
+  let L; if (lg === 382) { globalThis.__COVER = 0.4; try { L = bandPick(cands.filter(c => lgGroup(Number(c.f.lg)) === lg && notUsed(c)), new Set(), 6, 2); } finally { globalThis.__COVER = 0; } } else L = bandPick(cands.filter(c => lgGroup(Number(c.f.lg)) === lg && notUsed(c))); if (!L.length || seen.has(sigOf(L))) continue;   // כל המשחקים הישראליים (עד 6) באותו טופס seen.add(sigOf(L)); markUsed(L);
+  const lgs = [...new Set(L.map(c => Number(c.f.lg)))], has383 = matched.some(m => Number(m.f.lg) === 383), has382 = matched.some(m => Number(m.f.lg) === 382), info = LEAGUES.find(l => l.id === lg);
+  const name = lg === 382 && has383 && has382 ? 'ליגת העל והליגה הלאומית' : lg === 382 && has383 && !has382 ? 'ליגת העל' : (info ? info.he : 'ליגה ' + lg);
+  spec.fixed.push({ kind: 'league', label: name + ' · כל משחקי היום', legs: L.map(toLeg) }); }
 // טפסי יחס גבוה (בלי תקרה ליחס): משחקים רבים יותר, כל הימור מהסוגים הטובים והסבירים ביותר שנשארו. הסיכוי שלהם נמוך מטבעו, ולכן רק שניים ביום
 for (const H of [{ min: 8, max: 5, label: 'יחס גבוה · כל משחקי היום' }, { min: 16, max: 7, label: 'יחס גבוה (2) · כל משחקי היום' }]) {
   const pool = cands.filter(c => notUsed(c) && !(cupDay && CUP_LG.has(Number(c.f.lg))) && c.f.ts * 1000 > Date.now()); if (new Set(pool.map(gid)).size < 4) continue;
