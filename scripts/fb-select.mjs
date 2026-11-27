@@ -306,7 +306,7 @@ for (const C of activeCups) for (const S of SLOTS) {
 const lgGroup = lg => lg === 383 ? 382 : lg;
 for (const lg of [...new Set(matched.map(m => lgGroup(Number(m.f.lg))))]) {
   if (cupDay && CUP_LG.has(lg)) continue;
-  let L; if (lg === 382) { globalThis.__COVER = 0.4; try { L = bandPick(cands.filter(c => lgGroup(Number(c.f.lg)) === lg && notUsed(c)), new Set(), 6, 2); } finally { globalThis.__COVER = 0; } } else L = bandPick(cands.filter(c => lgGroup(Number(c.f.lg)) === lg && notUsed(c))); if (!L.length || seen.has(sigOf(L))) continue;   // כל המשחקים הישראליים (עד 6) באותו טופס seen.add(sigOf(L)); markUsed(L);
+  let L; if (lg === 382) { globalThis.__COVER = 0.4; try { L = bandPick(cands.filter(c => lgGroup(Number(c.f.lg)) === lg && notUsed(c)), new Set(), 6, 2); } finally { globalThis.__COVER = 0; } } else L = bandPick(cands.filter(c => lgGroup(Number(c.f.lg)) === lg && notUsed(c))); if (!L.length || seen.has(sigOf(L))) continue; seen.add(sigOf(L)); markUsed(L);
   const lgs = [...new Set(L.map(c => Number(c.f.lg)))], has383 = matched.some(m => Number(m.f.lg) === 383), has382 = matched.some(m => Number(m.f.lg) === 382), info = LEAGUES.find(l => l.id === lg);
   const name = lg === 382 && has383 && has382 ? 'ליגת העל והליגה הלאומית' : lg === 382 && has383 && !has382 ? 'ליגת העל' : (info ? info.he : 'ליגה ' + lg);
   spec.fixed.push({ kind: 'league', label: name + ' · כל משחקי היום', legs: L.map(toLeg) }); }
